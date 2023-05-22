@@ -1,0 +1,207 @@
+Graduate Research Consultation Project
+======================================
+
+14.1 Syntactic extensions
+-------------------------
+
+Let's give the programmer the ability to add their own syntactic extensions to
+the language.
+
+There are many ways to do this, for example, by allowing `special' and normal
+closures in the same way we have `special' and normal functions.  Another way
+is to rewrite lists as they are read, whenever they correspond to a special
+form.  This is the approach we will take here.
+
+User-defined syntax will be detected in the @read()@ function.  After reading a
+list, if the head is a @Symbol@ naming a user-defined syntax-rewriting function
+then that function is called, passing the elements of the list as arguments,
+and the result returned by that function is returned from @read()@ in place
+of the original list.
+
+We will store syntax definitions in an association list.  Create a variable to
+store this list (I called mine 'syntax') and initialise it to nil in main().
+
+Implement a special form 'define-syntax' that works like 'define' but instead
+adds an association between the name and value to the front of the 'syntax'
+association list.
+
+Modify read() so that immediately after reading a list it looks up the first
+element of that list in 'syntax' and if an association is found then its value
+(presumably a function) is apply()ed to the list that was just read and the
+result returned in place of the original list.
+
+Test your syntax mechanism with something like this:
+
+    (define-syntax foo
+      (lambda args
+        (println args)
+	42))
+
+    (define bar (foo 1 2 3))    ; prints "(foo 1 2 3)" and then
+                                ; => 42
+    bar                         ; => 42
+
+Note that the elements of the original list are passed to the rewrite function
+as individual arguments.
+
+14.2 Implementing 'cond' as a syntactic extension
+-------------------------------------------------
+
+Let's test the syntax mechanism "seriously" by implementing a useful, new
+syntactic form.
+
+The special form 'cond' accepts zero or more arguments.
+Each argument is a clause.
+Each clause is a pair of expressions, a test and a consequent.
+
+The test in the fist clause is evaluated.  If it's value is non-nil (true) then
+the result of the 'cond' is the result of evaluating the corresponding
+consequent.  Otherwise the process repeats with the next clause in the list.
+If none of the tests in the clauses evaluates to non-nil, then the overall
+result of 'cond' is nil.
+
+The following function 'name' returns the name of one of the first four
+counting numbers, or "unknown".
+
+    (define name
+      (lambda (n)
+        (cond
+	  ((= n 1)   'one)
+	  ((= n 2)   'two)
+	  ((= n 3)   'three)
+	  ((= n 4)   'four)
+	  (1         'unknown))))
+
+    (name 0)   => unknown
+    (name 1)   => one
+    (name 2)   => two
+    (name 3)   => three
+    (name 4)   => four
+    (name 5)   => unknown
+
+Implement 'cond' as user-defined syntax, transforming the clauses into a
+sequence of 'if' forms.  The above definition of 'name' will be transformed
+into the following form, as soon as read() encounters the '(cond ...)' list.
+
+    (define name
+      (lambda (n)
+        (if (= n 1)
+            'one
+            (if (= n 2)
+                'two
+                (if (= n 3)
+                    'three
+                    (if (= n 4)
+                        'four
+                        (if 1
+                            'unknown
+                            nil))))))))
+
+Hint: for the moment, the syntax mechanism works even inside quoted lists.  For
+example:
+
+    '(cond ((1 2) (3 4) (5 6)))  => (if (1 2) (3 4) (5 6) nil)
+
+Exploit this "bug" to help you debug and develop your 'cond' form.
+
+Hint: start small and gradually expand until you have the complete
+implementation.  For example, begin with
+
+    (define-syntax cond (lambda (cond . clauses) (println args) nil))
+
+    (cond ((1 2) (3 4) (5 6)))   ;; prints "((1 2) (3 4) (5 6))"
+    	   	      	    	 => nil
+
+Then write a function '(make-cond clause)' that converts a clause such as (1 2)
+into the corresponding 'if' form, or converts nil into nil:
+
+    (make-cond nil)     => nil
+    (make-cond '(1 2))  => (if 1 2)
+
+Add a second parameter '(make-cond clause rest)' in which 'rest' contains the value
+to put in the alternate part of the 'if':
+
+    (make-cond nil nil)     		=> nil
+    (make-cond '(1 2) nil)  		=> (if 1 2 nil)
+    (make-cond '(1 2) 42)   		=> (if 1 2 42)
+    (make-cond '(1 2) '((3 4) (5 6)))   => (if 1 2 ((3 4) (5 6)))
+
+In the last line of the example above, the 'rest' parameter contains the
+remaining clauses in the 'cond'.  Instead of inserting the 'rest' items into
+the list verbatim, if you instead insert the result of calling 'make-cond'
+recursively on (car rest) and (cdr rest), the rewrite of the entire 'cond' form
+would suddenly emerge.  Then all you have to do is define 'cond' as syntax that
+calls 'make-cond' passing the first clause and the rest of the clauses as the
+two arguments.
+
+How cool is that?  ;-)
+
+14.3 Challenge
+--------------
+
+Implement the following user-defined syntax
+
+    (let (binding ...) expression ...)
+
+in which each binding is a list:
+
+    (name value)
+
+First, each value expression in the bindings is evaluated, then each
+of the resulting values is associated with the corresponding name in
+the bindings.  Then each expression is evaluated with the final
+expression being the value returned by the entire form.
+
+    (let ((a 2)
+          (b 3)
+	  (c 4))
+      (println a)
+      (println b)
+      (println c)
+      (* (* a b) (+ b c)))    ;; 2
+      	      	      	      ;; 3
+			      ;; 4
+			      => 42
+
+Spend five minutes thinking about the "trick" that makes this really
+easy to implement.  If you cannot figure it out after five minutes,
+see below...
+
+      |
+      v
+      |
+spoiler alert
+      |
+      v
+      |
+spoiler alert
+      |
+      v
+      |
+spoiler alert
+      |
+      v
+      |
+spoiler alert
+      |
+      v
+      |
+spoiler alert
+      |
+      v
+      |
+spoiler alert
+      |
+      v
+
+This form
+
+    (let ((a 6)
+          (b 7))
+      (* a b))
+
+behaves identically to this anonymous function application:
+
+    ((lambda (a b)
+       (* a b))
+      6 7)

@@ -1,0 +1,374 @@
+Graduate Research Consultation Project
+======================================
+
+10. Quoted data and user-defined functions
+------------------------------------------
+
+Our program currently treats all input as a program and tries to evaluate
+almost everything (except for some arguments of special functions).  To write
+literal data in our programs, such as literal symbol names or lists, we need a
+way to prevent that data from being evaluated as a program.
+
+Add a special function "quote" that accepts one argument.  When evaluated
+
+    (quote data)
+
+returns the data (which can be any value) without evaluating it.  Your program
+should now be able to accept the following expressions:
+
+    input			output
+    =====			======
+    (quote 42)			42
+    (quote (1 (2) 3))		(1 (2) 3)
+
+Writing "(quote ...)" is a bit tedious.  Modify read() so that if the input
+character is a single quote "'" followed by any value "x" then the result of
+reading will be the list "(quote x)".  Verify that you get the following
+results, equivalent to the above:
+
+    input			output
+    =====			======
+    '42				42
+    ' (1 (2) 3)			(1 (2) 3)
+    ''hello  			(quote hello)
+
+Recall from earlier that our function representation comes from the
+mathematical notation used in the Lambda Calculus.  The list
+
+    (lambda (...parameters...) ...expressions...)
+
+represents a function that evaluates its expressions when called.  A simple
+example of this might be:
+
+    (lambda () 42)
+
+which is a function with no parameters whose result is always 42.  We would
+like our program to be able to call that function like this:
+
+    input			output			note
+    =====			======			====
+    '(lambda () 42)		(lambda () 42)		a function
+    ('(lambda () 42))		42	   		a function call
+
+Our apply() function already checks for "func" being one of the symbols naming
+a normal function such as "+" or "<".  Extend apply() so that it also checks
+for "func" being a list whose first element is the symbol "lambda".  In that
+case apply() should evaluate the third element of "func" as an expression and
+return the result.  Verify that the above example now works.
+
+We still cannot store a function in a variable and then call it using its
+symbolic name.  This is because neither eval() nor apply() ever evaluate the
+function, which is necessary to convert a symbol into its value.
+
+If apply() does not recognise the "func" as a built-in normal function (such as
+arithmetic) or a list containing a user-defined "lambda" function then it
+should evaluate "func" as an expression and then call itself recursively to try
+apply the result to the same list of arguments (which have already been
+evaluated in eval()).  Make this change and then verify that:
+
+    input				output
+    =====				======
+    (define f '(lambda () 42))		(lambda () 42)
+    (f)					3
+
+We can now implement parameter passing and local variables.
+
+First, if you have not already done it, modify eval(oop exp) so that the
+association list holding the variable names and values is passed as a second
+argument "env" (short for 'environment').  When evaluating a symbol, search
+"env" for an association (instead of searching "globals").  In main() you will
+have to call "eval(exp, globals)" to evaluate each 'top-level' expression in
+the context of the global variables.  Note that you will also have to modify
+evlist() and apply() to pass "env" to them so that they can properly call
+eval() recursively.  (Other than main(), the only place that still refers
+directly to "globals" should be the implementation of the special function
+"define".)  Verify that the above example still works properly.
+
+To implement parameter passing and local variables in apply() we have to modify
+"env" before evaluating the expression part of a "lambda" function.  In the
+function call
+
+    ('(lambda (x y) (* x y)) 6 7)
+
+apply() is called with:
+
+    func = (lambda (x y) (* x y))
+    args = (6 7)
+    env  = (... all the global variable associations ...)
+
+The list of parameter names is the second element of "func".  We will add as
+many "(parameter-name . argument-value)" associations to the front of "env" as
+there are parameter names in the second element of the "lambda" function list.
+To do this a function
+
+    pairlist(oop names, oop values, oop tail)
+
+will be helpful.  "names" is a list of symbols (e.g., the parameter names list
+that is the second element in a "lambda" function), "values" is a list of
+values (e.g., the evaluated arguments passed to apply() in "args"), and "tail"
+is the original association list that we are adding to (at its front) passed to
+apply() as "env".  For example, liberally mixing C and list notation:
+
+    pairlist( '(a b c), '(1 2 3), '((d . 4) (e . 5)) )
+    => ((a . 1) (b . 2) (c . 3) (d . 4) (e . 5))
+
+One way to do this, in pseudo-code, would be:
+
+    pairlist(names, values, tail) =
+        if names is empty then return tail
+	let ass = newCell(first element of names, first element of values)
+	let names2 = names with the first element removed (the d part of names)
+	let values2 = values with the first element removed (the d part of values)
+	return newCell(ass, pairlist(names2, values2, tail))
+
+Verify that:
+
+    input				output
+    =====				======
+    ('(lambda (x) x) 42)		42
+    ('(lambda (x y) (* x y)) 6 7)	42
+    (define less
+     '(lambda (x y)
+        (if (< x y) 'yes 'no)))		(lambda (x y) (if (< x y) 'yes 'no))
+    (less 3 4)				yes
+    (less 4 4)				no
+    (less 5 4)				no
+
+Writing the quote "'" in front of a "lambda" function list is tedious.  Make
+"lambda" be a special function that returns the expression it is part of (the
+original "exp" passed to eval()) without evaluating anything.  Verify that:
+
+    input				output
+    =====				======
+    (define dbl (lambda (x) (+ x x)))	(lambda (x) (+ x x))
+    (dbl 21)				42
+
+Finally, verify that
+
+    input					output
+    =====					======
+    (define factorial
+     '(lambda (n)
+        (if (< n 2)
+            1
+            (* n (factorial (- n 1))))))	=> (lambda (n) (if (< n 2) 1 (* n (factorial (- n 1)))))
+
+    (factorial 5)				=> 120
+
+which is the result that we originally set out to obtain.
+'
+================================================================
+
+Appendix: challenges and further exploration
+--------------------------------------------
+
+You now have a fully functional programming language in a couple hundred lines
+of code.  Its simplicity, and the fact that programs are represented as data,
+makes it a powerful vehicle for experiments with program representation,
+semantics, and programming paradigms.  Here are some fun things you might like
+to try:
+
+† Allow multiple expressions in a (lambda (...) ...) function and evaluate them
+  left-to-right when it is called.  The result of calling the function should
+  be the value of the last expression evaluated in its body.
+
+† Add comments to the language.  read() should treat a semicolon ';' and all
+  the characters following it on the same line a spaces.
+  
+  ??? in read() / nextchar()
+  it is ok or not?
+  $(print ;)
+
+† Add a normal function (print ...) that prints all its arguments separated by
+  spaces.
+  (print args)
+
+† Add a normal function (println ...) that prints all its arguments separated
+  by spaces and then a final newline.
+  (println args)
+
+< 0. symbol object >
+- Optimise variables by storing the global value of a variable directly in the
+  Symbol object that names it.  
+  
+  Use the "environment" association list only for storing local variables (function parameters).
+
+
+† Add a special function "while" that repeats some expression(s) as long as a
+  condition is true.
+
+    (while condition expressions...)
+
+† Add a special function "let" that introduces local variables.  The form
+
+    (let ((name1 value1)
+          (name2 value2)
+	  ...)
+      expressions...)
+
+  will evaluate each of the valueN expressions to produce N results, then each
+  corresponding nameN is associated with its valueN by adding a Cell to the
+  front of the environment.  Then the expressions are evaluated in the new
+  environment.  The result is the value of the last expression evaluated.
+
+† Add a special function "setq" that changes the value of an existing local or
+  global variable.
+
+    (setq symbol exp)	=> search the current environment for symbol (not
+    	  	 	   evaluated), set its value to exp (evaluated), and
+			   return exp; generate an error if symbol is not in
+			   the current environment
+
+  Print the first ten non-negative integers like this:
+
+    (define x 0)
+    (while (< x 10) (println x) (setq x (+ 1 x)))
+
+
+< 1. write prog in .txt>
+- Add some constructor and accessor functions to your language so that you can
+  use all the built-in types properly.  For example:
+
+    (atom? x)			=> nil if x is a Cell, otherwise 't
+    (integer? x)		=> 't if x is an integer, otherwise nil
+    (symbol? x)			=> 't if x is a symbol, otherwise nil
+    (cell? x)			=> 't if x is a Cell, otherwise nil
+    (cons a d)			=> a new cell with given a and d parts
+    (list a b c d ...)		=> the list (a b c d ...)
+    (car x)                     => the head of the list x, or nil
+    (cdr x)                     => the tail of the list x, or nil
+    (set-car x y)		=> set the a part of Cell x to y
+    (set-cdr x y)		=> set the d part of Cell x to y
+    (eq? x y)			=> 't if x and y are the same object
+
+  ??? It is OK that I write func used for .txt code in main code .c.
+  such as car cdr...
+
+
+
+< 2. eval, apply .....>
+- Write the entire interpreter (eval, apply, and associated functions evlist,
+  pairlist, etc.) as user-defined functions in your language.  Measure how much
+  more slowly your "userland" interpreter performs compared to the C
+  implementation.  You should be able to do something like this
+
+    (eval '(define f (lambda (n)
+                       (if (< 2 n)
+		           1
+			   (* n (f (- n 1)))))))
+    (eval '(f 5))
+
+  to produce the answer "120".
+
+  ??? where I wirte them in.
+  which .txt / .C
+
+
+
+< 3. eval & apply >
+- Add normal functions (eval x) and (apply fn args) to your language that
+  evaluate expressions and call functions using the compiled C versions of
+  those functions.
+
+  ??? where i should wirite (eval x) and (apply fn args).
+  which .txt / .c
+
+
+
+< 4. syntax table>
+- Implement basic meta programming.  Create a 'syntax table', an association
+  list of symbols whose values are functions.  In the read() function, when a
+  list L has been read and its first element S is a symbol, look up S in the
+  syntax table.  If S is not found, return L as-is. 
+
+  If S is found, apply its
+  value F (which should be a function) to L and return the result F(L) instead
+  of the original list L.  
+
+  This mechanism will allow you to create "macros" in
+  your language, functions that manipulate the syntactic structure of programs
+  as they are being read.
+
+  syntaxTable <- function list ((s f) (s f) ...)???
+  list: L
+  -> its first element: S    *symbol
+  if S in syntaxTable -> apply its value F (which should be a function) to L and return the result F(L) instead of the original list L.  
+  else -> L
+
+  
+
+† Implement a special function "quasiquote" that behaves like "quote" with one
+  difference: it makes a copy of its argument and looks for elements that are
+  lists of the form "(unquote x)".  Any element with that form is replaced by
+  the result of evaluating "x".  You can then create data structures with
+  computed contents, like this:
+
+    (quasiquote (1 (+ 2 3) (unquote (+ 4 5)) (+ 6 7)))
+    => (1 (+ 2 3) 9 (+ 6 7))
+
+  In the read() function give quasi-quote and unquote special character
+
+    `foo   ==  (quasiquote foo)
+    ,foo   ==  (unquote foo)
+
+  so that:
+
+    `(1 (+ 2 3) ,(+ 4 5) (+ 6 7))	=> (1 (+ 2 3) 9 (+ 6 7))
+
+† Implement "unquote-splicing" which is like "unquote" except that it can only
+  appear in a list and must result in a list when evaluated.  It then inserts
+  its result's elements into the enclosing list, like this:
+
+    (list 2 3 4)				=> (2 3 4)
+    `(1 (unquote (list 2 3 4)) 5)		=> (1 (2 3 4) 5)
+    `(1 (unquote-splicing (list 2 3 4)) 5)	=> (1 2 3 4 5)
+
+  In the read() function, make ",@x" generate the list "(unquote-splicing x)",
+  so that you can write the previous example as:
+
+    `(1 ,@(list 2 3 4) 5)			=> (1 2 3 4 5)
+
+† Use the syntax table, quasiquote, unquote, and unquote-splicing to implement
+  the macro
+
+    (cond (c1 v1) (c2 v2) ... (cn vn))
+
+  which evaluates each condition "cx" until one of them "cn" has a non-nil
+  result, then it evaluates the corresponding "vn" and returns that as the
+  overall result, for example:
+
+    (define bit
+      (lambda (b)
+        (cond
+      	  ((= x 0)    'zero)
+      	  ((= x 1)    'one)
+      	  ('t         'non-binary))))
+
+    (bit 0)		=> zero
+    (bit 1)		=> one
+    (bit 2)		=> non-binary
+
+  One way to implement this is to convert the "(cond ...)" form into a series
+  of nested "if"s using a recursive helper function that operates in a similar
+  way to the pairlist() function.
+
+† Implement a macro
+
+    (let ((n1 v1) (n2 v2) ...) e1 e2 ...)
+
+  that evaluates all the values "vx" and then assigns them to local variables
+  called "nx" before evaluating the expressions "ex" and returning the value of
+  the last "ex" as its result.  This is actually quite easy, by transforming
+  the above form into:
+
+    ((lambda (n1 n2 ...) e1 e2 ...) v1 v2 ...)
+
+  For example, you would transform
+
+    (let ((x 3)
+          (y 4))
+      (+ x y))
+
+  into:
+
+    ((lambda (x y) (+ x y)) 3 4)

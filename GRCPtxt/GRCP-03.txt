@@ -1,0 +1,106 @@
+Graduate Research Consultation Project
+======================================
+
+3.  Reading values from the input
+---------------------------------
+
+Write a function
+
+    oop read(void)
+
+that is the 'opposite' of the print() function: it reads characters from the
+standard input and constructs a corresponding object.
+
+For example, if stdin contains the characters " 42 " then calling read() will
+return the Integer object with value 42.  You should skip over any initial
+space and then read as many decimal digits as possible, accumulating an 'int'
+value.  Return the value as an object by calling newInteger().  (If you
+encounter any non-space, non-digit character before an integer then you should
+print an error message and exit.)
+
+Some useful functions for this part:
+
+    isspace(int c)    returns non-zero (true) if c is space, tab, newline, ...
+    isdigit(int c)    returns non-zero if c is a decimal digit 0-9
+    ungetc(c, stdin)  pushes c back onto stdin, ready for the next getchar()
+
+Verify this works by converting several integers with one or more digits.  You
+can use this "read-print" loop as your main function to check everything is working:
+
+    int main()
+    {
+        for (;;) { // read-print loop
+            oop obj = read();
+            if (!obj) break; // EOF
+            println(obj);
+        }
+        return 0;
+    }
+
+Extend read() so that if stdin contains " foobar " then it will return the
+Symbol with name "foobar".  Verify this works on input containing a variety of
+integers and symbols.  Make sure it works for symbols with digits that occur
+after the first character.  So that we can write it easily, make your function
+return the Undefined object (nil) if the input contains the symbol "nil".  Some
+useful functions for this part are:
+
+    isalpha(c)   returns non-zero (true) is c is alphabetic (a letter)
+    isalnum(c)   returns non-zero (true) is c is alphanumeric (letter or digit)
+
+Optional (but recommended): modify the symbol reading code so that some
+non-alphabetic characters are also allowed within a symbol.  The following
+additional characters should be allowed to appear anywhere in a symbol:
+
+    ! # $ % & * + - / : < = > ? @ \ ^ _ | ~
+
+One easy way to detect whether a character c is in this list is to use
+
+    strchr("!#$%&*+-/:<=>?@\\^_|~", c)
+
+which returns non-NULL (true) if c is found in the string.  In addition to
+these characters, you should also allow digits to appear in a symbol (except as
+the first character, of course).  With these changes, the following should all
+be valid symbols:
+
+    foo foo-bar even? + - +1 -1 $$ &foo :bar
+
+Finally, extend read() so that if stdin contains "(foo.666)" then it will return
+a Cell with the symbol "foo" as its "a" value and the integer "666" as its "d"
+value.  Note that to read the "a" and "d" parts of the cell the read()
+function can call itself recursively (similar to the way print() calls itself
+recursively to print the "a" and "d" parts of a Cell).
+
+Verify this works by converting several lists such as:
+
+    (x . 42)
+    (nil . nil)
+    (1 . (2 . (3 . nil)))
+
+Make sure that badly formed lists are detected properly.  For example:
+
+    input     error
+    -----     -----
+    (         EOF while reading list
+    (1        EOF while reading list
+    (1.       EOF while reading list
+    (1 2      mal-formed list, '.' expected
+    (1 2      mal-formed list, '.' expected
+    (1.2      EOF while reading list
+    (1.2 3    mal-formed list, ')' expected
+
+
+Next steps: If you would like to plan ahead a little, the final steps
+in developing the read() and print() functions will be to allow proper
+list syntax, so that:
+
+    input                           printed as
+    -----                           ----------
+    (1 . (2 . (3 . nil)))           (1 2 3)
+    (1 2 3)                         (1 2 3)
+    (1 . (2 . (3 . four)))          (1 2 3 . four)
+    (1 2 3 . four)          	    (1 2 3 . four)
+    ()
+                                    ^^^
+                                     ?  ;-)
+
+Teaser: What should be printed for the input "()"?  Why?

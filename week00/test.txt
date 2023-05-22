@@ -1,0 +1,103 @@
+;;;; GRCP-14 cond & let 2023.05.16
+(println 'test.txt)
+
+
+
+;;;; [ float ]
+    ;; (define int 12345)
+    ;; (define float 1.459)
+    ;; (define float 0.45)
+    ;; (define float 12.459)
+    ;; (define float 0.459)
+    ;; (define float 0.453)
+    ;; (define float 0.333)
+    ;; (println '---------)
+    ;; (define float 123.4)
+    ;; (define float 123.45)
+    ;; (define float 123.453)
+
+;;;; [ cond ]
+    (define list (lambda args args))
+    (define make-cond (lambda (clause rest)
+                    (if (list? clause) 
+                        (list 'if (car clause) 
+                                (car (  clause))
+                                (make-cond (car rest) (cdr rest))
+                                )
+                    )
+        )
+    ) 
+        (make-cond '(1 2) '((3 4)(5 6)))    
+
+    (define-syntax cond (lambda (cond . args)
+                    (make-cond (car args) (cdr args))))
+
+
+    (define test (lambda (x)
+            (cond 
+                ((= x 1) 'one)
+                ((= x 2) 'two)
+                ((= x 3) 'three)
+                (1       'unkown)
+            )
+    )
+    )
+        (test 1)
+        (test 2)
+        (test 3)
+        (test 4)
+
+
+;;;; [ let ]
+    ;; (define para (lambda (args)
+    ;;         (if (list? args)
+    ;;             (cons (car (car args)) (para (cdr args)))
+    ;;         )
+    ;;     )
+    ;; )
+
+    ;; (define valu (lambda (args)
+    ;;         (if (list? args)
+    ;;             (cons (car (cdr (car args)))  (valu (cdr args)))
+    ;;         )
+    ;;     )
+    ;; )
+
+    ;;     ;; (para '((a 2) (b 3) (c 4) (d 5)))
+    ;;     ;; (valu '((a 2) (b 3) (c 4) (d 5)))
+
+    ;; (define make-let (lambda (clause . exp)
+    ;;         (cons (cons 'lambda (cons (para clause) exp)) (valu clause))
+    ;;     )
+    ;; ) 
+
+    ;; (make-let '((a 6) (b 3) (c 4)) '(* a (+ b c)) '(+ a b))
+
+    ;; (define-syntax let (lambda (let . args)
+    ;;                 (println '----)
+    ;;                 (println let)
+    ;;                 (make-let (car args) (car (cdr args)))))
+
+    ;;     ( (lambda (a b c)
+    ;;         (* a (+  b c)))
+    ;;     6 3 4)
+
+    ;; (define test2 (lambda () 
+    ;;     (let ((a 6) (b 3) (c 4))
+    ;;     (* a (+ b c)))
+    ;; ))
+    ;;     (test2)
+    ;;     (test2)
+
+    ;; (define test2 (lambda (A B C) 
+    ;;     (let ((a A) (b B) (c C))
+    ;;     (* a (+ b c)))
+    ;; ))
+    ;;     (test2 6 3 4)
+    ;;     (test2 2 1 1)
+    
+;;;;
+(define stop (lambda ()
+            (println 'GRCP14_END_OF_THE_FILE)
+            (exit)))
+(stop)

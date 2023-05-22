@@ -1,0 +1,48 @@
+Graduate Research Consultation Project
+======================================
+
+6.  Evaluating program expressions
+----------------------------------
+
+Programs will be represented as data.  More precisely, any object or list will
+represent an expression that can be evaluated to yield a value.  For example,
+evaluating
+
+    (* 6 7)
+
+will yield the Integer 42.
+
+Evaluating a program will have very simple rules.  Both the Undefined object
+"nil" and Integers will evaluate to themselves.  If "=>" means "evaluates to",
+then:
+
+    nil => nil
+    ()  => nil
+    0   =>   0
+    42  =>  42
+
+Write a function
+
+    oop eval(oop exp)
+
+that evaluates the object/list exp as an expression.  Begin by only considering
+the Undefined object and Integers.  Since both types evaluate to themselves
+this function is very easy to write.
+
+Modify main() so that the read-print loop becomes a read-eval-print loop.
+After reading an object and checking for NULL (end of file), call eval() on the
+object to evaluate it and then print the result.  Test it with the following
+input:
+
+    input	output
+    -----	------
+
+    nil		nil
+    ()		nil
+    0		0
+    42		42
+    foo		error: cannot evaluate symbols
+    (1 2 3)	error: cannot evaluate lists
+
+The next step will be to evaluate Symbol objects, which represent
+variable names.

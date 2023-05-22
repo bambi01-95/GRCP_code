@@ -1,0 +1,39 @@
+Graduate Research Consultation Project
+======================================
+
+5.  Making symbols be unique
+----------------------------
+
+To make comparison of names efficient we should ensure that Symbols are unique.
+In other words, newSymbol(char *name) should always return identically the same
+Symbol object for the same name.  Amongst other things this will allow us to
+use simple comparison (==) instead of strcmp() to compare whether two symbols
+represent the same name.
+
+The usual way to do this is to build a symbol table containing every symbol
+that has been created so far.  When newSymbol(name) is called it first checks
+the symbol table for an existing symbol with the same name, using strcmp() to
+search for name among the symbols already in the table.  If an existing symbol
+is found with the desired name then it is returned immediately.  If no symbol
+exists with the desired name then a new Symbol object is created, added to the
+table, and returned as the result.
+
+There are many ways to manage the table.  The simplest way is to use a
+fixed-size array and linear search to find an existing symbol.  The best way is
+to use a dynamically sized array (using realloc() to grow it each time a new
+symbol object is created and added to the table) whose contents are always
+sorted (according to strcmp()) so that a binary search can be used to locate an
+existing symbol.  Use whichever mechanism you are most comfortable with.
+
+To test this you can temporarily modify print() so that Symbols are printed as
+
+    "<%p>%s", obj, obj->Symbol.name
+
+which will show you immediately whether read()ing the same symbol name multiple
+times produces the same symbol at the same address in memory.
+
+The next step in the project will be to begin writing the function
+
+    oop eval(oop expr)
+
+which evaluates the expression represented by the object expr.

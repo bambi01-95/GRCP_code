@@ -1,0 +1,22 @@
+既存のコードでは、関数ないで＊定義されていない変数は加えることができない。
+(define x_min_letter (lambda (x)
+                        (+ x (time_now))))
+このような場合は可能だが
+(define x_min_action (lambda (x)
+                    (def t (time_now))
+                    (if (< t 10) 10
+                                20)))
+は現状できない。
+長いコードになるにつれて、関数ない定義は重要になる。
+そこで、
+(def x y)でその関数のClosure->envに直接新たなパラメータを加えるようにした。
+
+問題点
+もし、Closure->env == nilのとき、ローカル環境に新たに変数を定義することは不可能である。
+なぜなら、
+(env = nil)  == (nil == env) であるためだ。
+つまり、
+env.type = Cell
+なら
+nil.type = Cell
+ということになるからだ。。。。

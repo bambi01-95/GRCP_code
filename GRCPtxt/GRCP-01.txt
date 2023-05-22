@@ -1,0 +1,104 @@
+Graduate Research Consultation Project
+======================================
+
+1.  Atomic values
+-----------------
+
+An "atomic" a value is one that cannot be broken into smaller parts.  Integers
+and symbols are examples of atomic values.  We (initially) need three types of
+atomic value: integers, symbols, and a value representing "nothing" or
+"undefined" (the absence of a value).
+
+Just like mathematics (and Python and JavaScript) our language will be
+dynamically typed.  Type will be a property of values, not a property of the
+variables in which they are stored.  A variable will be able to hold values of
+any type, and we will only look at the type of a value when we try to perform
+an operation on it.
+
+Representing dynamically typed values in C can be done easily using a "tagged
+union".  One member of the union is an integer that says what type of value is
+stored there.  The other members are "struct"s, one per type, that contain the
+C representation of a value of that type.  Each "struct" member of the union
+should begin with the same integer describing the type, so that when all the
+members of the union are overlaid at the same address in memory the tag will be
+in the same place regardless of whether you access it through the union or
+through one of the member structures.
+
+This is easier to draw than to describe.
+
+union Object {
+  int           type;    // what type of data is stored in this object
+  struct First  First;   // data for objects of type "First"
+  struct Second Second;  // data for objects of type "Second"
+};
+
+struct First  { int type;  /* ... data for objects of First type  ... */  };
+struct Second { int type;  /* ... data for objects of Second type ... */  };
+
+We can use the same identifier for each structure tag (name) and the name of
+the union member that holds the data of the structure.  One thing C gets right
+is its multiple name spaces that separate the names used for struct/union tags,
+struct/union member names, and enumeration constant names.  We can use the same
+names again for enumeration constants to use as the unique numbers stored in
+the "type" member.
+
+enum { First, Second, ... };
+
+
+You can now build your three atomic types for integers, symbols, and the
+undefined object that represents "nothing" or "the absences of any value".  The
+symbolic names Integer, Symbol, and Undefined would be good choices for their
+types.  Integers should store an "int" value.  Symbols should store their name,
+most easily represented as a C string (nul-terminated "char *").  The Undefined
+object does not need to store any data (other than the mandatory "type"
+member).
+
+
+You now have all the hints you need to implement an effective object system for
+the atomic types in our data and program representation.  The interface will be
+through a set of constructor and accessor functions.
+
+To allocate memory for each new object you can use malloc, or better calloc()
+because it will fill every new object with zero.  When creating a symbol you
+can use strdup() to make a private copy of its name.  Let's start with these:
+
+    typedef union Object Object;
+
+    Object *newObject(int type);    // creates a new object with the given type
+    int Object_type(Object *obj);   // fetch the type of obj
+
+    Object *newInteger(int value);  // make an Integer with the given value
+    int Integer_value(Object *obj); // fetch the value of an Integer object
+
+    Object *newSymbol(char *name);  // make a Symbol with the given name
+    char *Symbol_name(Object *obj); // fetch the name of a Symbol object
+
+    void print(Object *obj);        // print the object on stdout
+    void println(Object *obj);      // print the object and then a '\n'
+
+The accessor functions can, and should, check that "obj" is the correct type of
+Object for the accessor.  Since it is an implementation bug if the type is not
+correct, you can print a suitable error message and exit(1) or abort() the
+program if the type of "obj" is not correct.
+
+Here's a simple test of the object system:
+
+
+typedef Object *oop;
+
+int main()
+{
+    oop nil = newObject(Undefined);
+    oop i   = newInteger(42),   j = newInteger(666);
+    oop s   = newSymbol("foo"), t = newSymbol("bar-baz");
+
+    println(nil);   // => nil
+    println(i);     // => 42
+    println(j);     // => 666
+    println(s);     // => foo
+    println(t);     // => bar-baz
+
+    printf("%d\n", Integer_value(s)); // => ERROR!
+
+    return 0;
+}

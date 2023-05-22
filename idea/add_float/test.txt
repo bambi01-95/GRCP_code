@@ -1,0 +1,5 @@
+(define a 1.0001)
+(define b 12.123)
+
+(println 'error)
+(define c 123.123)

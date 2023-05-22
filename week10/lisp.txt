@@ -1,0 +1,53 @@
+;; note: this memo is used for check the atom? .... grcp_10.txt
+(define i 10)
+(define c '(1 2 3))
+(define s 'asdf)
+
+(println (atom? i))
+(println (atom? c))
+
+
+(println (car c))
+(println (cdr c))
+
+(println 'integer)
+(println (integer? (car c)))
+(println (integer? c))
+
+(println 'symbol)
+(println (symbol? s))
+(println (symbol? i))
+
+(println 'Cell)
+(println (cell? c))
+(println (cell? i))
+
+(println 'cons)
+(define nc (cons s i))
+(println nc)
+
+
+(define li (list i s c))
+(println li)
+
+;(set-car c i)
+;(set-cdr c s)
+;(println c)
+(println 'eq)
+(println (eq? i i))
+(println (eq? '+ i))
+(println (eq? 'asdf s))
+
+(println 'ReachTheEnd)
+
+    ;   (atom? x)			=> nil if x is a Cell, otherwise 't
+    ;   (integer? x)		=> 't if x is an integer, otherwise nil
+    ;   (symbol? x)			=> 't if x is a symbol, otherwise nil
+    ;   (cell? x)			=> 't if x is a Cell, otherwise nil
+    ;   (cons a d)			=> a new cell with given a and d parts
+    ;(  list a b c d ...)		=> the list (a b c d ...)
+    ;   (car x)                     => the head of the list x, or nil
+    ;   (cdr x)                     => the tail of the list x, or nil
+    ;(set-car x y)		=> set the a part of Cell x to y
+    ;(set-cdr x y)		=> set the d part of Cell x to y
+    ;(eq? x y)			=> 't if x and y are the same object

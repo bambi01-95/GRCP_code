@@ -1,0 +1,178 @@
+Graduate Research Consultation Project
+======================================
+
+11. Generalising built-in primitive and special functions
+---------------------------------------------------------
+// {2023/04/25
+/*
+    APPLY
+*/
+The apply() function has a long chain of 'if' statements that detect the
+built-in primitive functions (such as '<', '*', and '-'.)  As we add more
+functions this chain gets longer and longer.  A more scalable approach is to
+have a value that represents a callable primitive function (i.e., a function
+defined in C).  Each primitive operation is then a normal global variable whose
+value happens to be one of these callable function objects.
+
+The first step of generalisation is to place each primitive behaviour into its
+own function in the apply() function.  For each primitive test and
+implementation following this pattern
+
+    if (func == sym_plus) {
+        // perform addition operation on args here
+        return result;
+    }
+
+replace the test with
+
+    if (func == sym_plus) return prim_add(args, env);
+
+and move the implementation into its own function:
+
+    oop prim_add(oop args, oop env)
+    {
+        // perform addition operation on args here
+        return result;
+    }
+
+Compile the program and verify that it still works with the factorial example.
+
+The next step is to create a new value type, Primitive, that represents a
+callable C function.  The internal value stored in one of these objects is a
+pointer to one of the prim_* functions.  Given a type 'prim_t' that describes
+the type of these functions, write the corresponding constructor and accessor
+functions:
+
+    oop newPrimitive(prim_t function);
+    prim_t Primitive_function(oop obj);
+
+Extend the print() function to print a Primitive value, perhaps representing it
+as
+
+    <Primitive.0x8ed9bc0>
+
+where "0x8ed9bc0" is the C function pointer stored in the Primitive.  You can
+test your code by adding this to the start of main():
+
+    println(newPrimitive(prim_add));
+
+// 2023/04/25}
+
+The next step is to define global variables with appropriate names to hold
+these values.  To help with this, write a function
+
+    oop define(oop name, oop value)
+
+that defines name as a global variable associated with the given value.  At the
+start of main() you can now create variables for the built-in primitive
+functions, starting with
+
+    define(newSymbol("+"), newPrimitive(prim_add));
+
+and continuing with all the other primitive functions that you have.
+
+Finally you will have to modify eval() and apply() so that they call these
+built-in primitives using the Primitive values of the new global variables.
+Remove the 'if' statements from apply() that detect each of the primitive
+operations.  In their place, check whether the function passed to apply()
+is a Primitive and, if it is, call it and return the result.
+
+Verify that the factorial example still works.
+
+// 2023/04/27
+
+The eval() function has a similar mechanism to detect and implement the special
+forms (which do not evaluate all of their arguments), such as 'define', 'if',
+and 'lambda'.  You can generalise these special forms in exactly the same way
+as the primitive functions.
+
+Begin by moving each implementation of a special form "(X ...)" into its own
+
+    oop spec_X(oop args, oop env)
+
+function, leaving the detection mechanism (comparing symbol values) the same.
+Check your factorial example still works.
+
+Next you need another value type, Special, which is identical to Primitive
+(holding a prim_t pointer to one of the spec_X functions).  Define each special
+form as a global variable, the same way you defined the primitives except using
+newSpecial(spec_X) instead of newPrimitive(prim_X).
+
+The final step is to remove the symbol comparisons from eval() and instead
+check the type of the function being applied when evaluating a list.  For this
+to work, when evaluating a list you must begin by eval()ing just the first
+element (the function).  If the result of that is *not* a Special then you can
+also evaluate all of the arguments.  Call apply() with the evaluated function
+and the (possibly evaluated) arguments.  Within apply() you can treat a Special
+in exactly the same way as a Primitive.  (Note that "lambda" will have to
+rebuild the original expression by pre-pending a symbol to its args.)  You can
+also now remove the final step of apply() which evaluates the function and
+calls itself.
+
+You should now have much simpler eval() and apply() functions that look
+something like this:
+
+eval(exp, env) {
+    if exp is a Symbol {
+    return cdr(assoc(exp, env)) if it exists
+    error: exp is an undefined variable 
+    }
+
+    if exp is a list {
+        func = eval(car(func), env);
+        args = cdr(func);
+        if func is not a Special then args = evlist(args, env)
+        return apply(func, args, env)
+    }
+    return exp, because any other type (nil, integer, ...) evaluates to itself
+}
+
+apply(func, args, env) {
+    if func is a Primitive f, return f(args, env)
+    if func is a Special f,   return f(args, env)
+    if func is a list and car(func) is "lambda" {
+        bind the args to the lambda parameters
+        evaluate each lambda expression
+        return the result of the last expression
+    }
+    error: func is not an applicable type
+}
+
+Your factorial example should still work perfectly.
+
+In the next part we will address two inefficiencies with our little language:
+// 2023/04/27 clear
+ 1. Each primitive function or special form has to be looked up in the environment
+    just like any other variable, causing a lot of unnecessary calls to 'assoc'.
+    We can optimise this by storing the global value of a variable directly in the
+    Symbol object.  (The 'env' association list will then be used only to store
+    local variables such as function parameters.)
+// 
+ 2. When a 'lambda' special form is evaluated it rebuilds an identical form by
+    pre-pending 'lambda' to the un-evaluated args.  
+    
+    This happens every time a user-defined function is applied to some arguments
+     and is very wasteful.
+     
+    We can optimise this by creating a new value type to represent an evaluated
+    '(lambda ...)' form (holding a parameter list and an expression list) and
+    then treating it just like a Primitive or Special everywhere except in
+    apply(). 
+    
+     When an evaluated lambda is applied its parameters will be
+    associated with the actual arguments and then its expressions evaluated to
+    yield the result.
+
+    (f 5)
+    eval cell               (f 5)
+    appy symbol             apply(eval(f 5))
+    eval symbol             f -> (lambda ....)
+    apply cell              ((lambda ...) 3 4 5)
+    eval  cell              (+ a b)
+
+
+    (define a (lambda (x) (+ x x)))
+
+
+
+

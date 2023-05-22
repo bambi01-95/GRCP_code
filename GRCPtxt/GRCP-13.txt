@@ -1,0 +1,222 @@
+Graduate Research Consultation Project
+======================================
+
+13.1 Lexical variable scope
+---------------------------
+
+Our local variables behave a little strangely.  Try running this program:
+<test 1>
+    (define bar (lambda (x) (- x 1)))
+    (bar 43)
+
+When the function 'bar' is called, a new association (x . 43) is added to the
+environment.  The body runs, finds x is 43, subtracts one from it, and returns
+the expected result, 42.
+
+What should be the result of this similar program?
+<test 2>
+    (define foo (lambda () (- x 1)))
+    (define bar (lambda (x) (foo)))
+    (bar 43)
+
+When 'bar' is called the association (x. 43) is added to the environment.  Then
+'foo' is called, with the *same* environment containing (bar . 43).  The local
+parameter variable 'x' is still 43, and the expression (- x 1) returns 42 from
+'foo', and then from 'bar', to give the same final result.  Is that the
+behaviour you expect?
+
+The parameter 'x' is available inside the function 'foo' because the
+environment created by calling 'bar' is preserved when 'foo' is called, leaving
+'x' accessible.  All the parameters from all running functions are available,
+with the environment being extended and truncated according the dynamic
+behaviour of the program; in other words, the order in which functions are
+called and returned from controls the adding and removing of their parameters
+from the current environment.
+
+This is called 'dynamic scoping' because the scope of a variable (the part of
+the program in which is it accessible) is determined by the dynamic behaviour
+(pattern of function calls and returns) of the program when it is run.
+
+Try this similar program:
+<test 3>
+    (define foo
+      (lambda ()
+        (lambda () 42)))
+
+    (define bar (foo))
+    (bar)
+
+The function 'foo' returns another function that, when called, will return 42.
+The function returned by 'foo' is assigned to 'bar'.  The function stored in
+'bar' is then called, runs the function that was returned by 'foo', and the
+result is again 42.
+
+What should be the result of this similar program?
+<test 4>
+    (define foo
+      (lambda (n)
+        (lambda () n)))
+
+    (define bar (foo 42))
+    (bar)
+
+The function 'foo' is called with argument 42, the environment is extended with
+(n . 42), the body runs and returns a function that, when called, will return
+the value of 'n', and this new function is stored in 'bar'.  That function in
+'bar' is then called, with an empty environment (since the expression is at the
+top level, outside any other running function), the body evaluates 'n', but
+there is no binding for that variable.  Either an "undefined variable" error
+occurs, or the global value of 'n' (if it exists) is returned.  Is that the
+behaviour you expect?
+
+Programmers familiar with block-structure languages will probably expect the
+result of calling 'bar' to be 42, because the parameter 'n' is accessed from
+the body of a function that is inside the body of another function that created
+the parameter 'n'.  In other words, the scope of a variable follow the static
+structure of the program, not the dynamic behaviour of the program.
+
+This is called 'lexical scoping' because it follows the structure of the
+written program, not the dynamic pattern of calls and return when the program
+is run.
+
+There are situations where dynamic scoping makes sense, but generally
+programmers will expect scoping to be lexical.  The variables that are in-scope
+(accessible) will be obvious, just from looking at the program.  The programmer
+can tell immediately whether the value of a variable will be the local value
+from a parameter in the environment, or the global value stored in the symbol.
+
+It is very easy to arrange lexical scoping.  Consider the last example above.
+When '(foo 42)' runs, it extends the environment with (n . 42).  The body then
+runs and the result function is created (as a Closure) in the environment that
+defines the parameter 'n'.  When that function (Closure) is run, to ensure that
+'n' is again accessible we should restore the environment in which its Closure
+was created (the environment in which 'foo' was running).  Let's add another
+member to the Closure structure, called 'environment', that remembers the
+active environment at the moment the closure is created.  For this you will
+also have to add a third parameter to newClosure, specifying the active
+environment.  Fortunately (<grin/> ;-)) the 'env' parameter to spec_lambda()
+contains exactly the environment we should store in the Closure.
+
+The only remaining thing is to restore that environment when a Closure is
+called as a function.  This is also trivial.  Before executing the body of a
+Closure, the environment is extended with parameters bound to argument values
+by calling pairlist(parameters, arguments, env).  Instead of the active
+environment 'env', if you pass the environment stored in the Closure to
+pairlist() then the variables that were lexically in-scope when the Closure was
+created (plus any parameters that the Closure creates) will again be in-scope
+when the body expressions of the Closure are evaluated.
+
+With these two changes the last example above should produce the result 42, as
+follows:.
+<test 5>
+    (define foo
+      (lambda (n)
+        (lambda () n)))
+
+    (define bar (foo 42))
+    (bar)
+
+The function 'foo' is called with parameter 42, the environment is extended
+with (n . 42), then '(lambda () n)' is evaluated to create a Closure that
+remembers the active environment containing (n . 42).  This closure is returned
+and stored in 'bar'.  When 'bar' is called, the Closure's original environment
+(n . 42) is used when calling pairlist() to create the (non-existent)
+parameters, and then the body runs with 'n' once again accessible as a local
+variable with the value 42.  Since 'n' is no longer undefined, the call to
+'bar' returns the value of 'n' successfully, and the final result is 42.
+
+There are other significant advantages to lexical scoping.  One advantage is
+the ability to create private, persistent variables:
+
+    (define make-ctr
+      (lambda (n)
+        (lambda ()
+	  (setq n (+ n 1)))))
+
+    (define c (make-ctr 10))
+
+Calling 'make-ctr' with an argument creates an environment containing the
+association '(n . 10)'.  The body of make-ctr is a lambda expression that
+creates and returns a Closure that holds on to the environment in which it was
+created (containing the association for 'n').  Every time that function runs
+its creation environment is restored, giving it access to 'n' again.  In this
+example the function increments 'n' each time it is called:
+
+    (c)   => 11
+    (c)   => 12
+    (c)   => 13
+    (c)   => 14
+
+This feature can be generalised to create 'private' storage of any complexity
+for any number of functions.  The following function returns a list of three
+functions that return a counter's value, increment it, or decrement it:
+<test last>
+    (define make-ctr
+      (lambda (n)
+        (list
+          (lambda () (setq n (- n 1)))
+          (lambda () n)
+          (lambda () (setq n (+ n 1))))))
+
+This is almost object-oriented programming.  You could consider 'make-ctr' to
+be an object constructor function, the closed-over state (the parameter 'n') to
+be the state (instance variables) of the object, and the three functions that
+it returns to be methods that request information of, or actions from, the
+object.
+
+
+13.2 'Rest' arguments
+---------------------
+
+Our primitive and special functions receive a list of arguments.  This allows
+them to process a variable number of arguments.
+
+Our Closures currently have a fixed number of parameters.  If there are too few
+arguments then the missing values are assume to be nil.  If there are too many
+arguments then the excess values are evaluated but discarded.
+<test 7>
+    (define foo (lambda (x y z)
+      (println x)
+      (println y)
+      (println z)))
+
+    (foo 1 2)       => 1 2 nil
+    (foo 1 2 3 4)   => 1 2 3
+
+A trivial change to the pairlist(names, values, tail) function will allow a
+Closure to receive a list of arguments.
+<test 8>
+    (define foo
+      (lambda args     ;;args should be (args)?
+        (println args)))
+
+    (foo)           => nil
+    (foo 1)         => (1)
+    (foo 1 2)       => (1 2)
+    (foo 1 2 3)     => (1 2 3)
+    (foo 1 2 3 4)   => (1 2 3 4)
+
+More generally, if pairlist finds that the 'names' is a 'dotted' list ( ending
+with a Symbol instead of nil) then the entire list of remaining 'values' can be
+associated with that final Symbol:
+<test 9>
+    (define bar
+      (lambda (a b . c)
+        (println a)
+        (println b)
+        (println c)))
+
+    (bar)           => nil nil nil
+    (bar 1)         => 1 nil nil
+    (bar 1 2)       => 1 2 nil
+    (bar 1 2 3)     => 1 2 (3)
+    (bar 1 2 3 4)   => 1 2 (3 4)
+
+
+You can now write a very useful function 'list', which constructs a list from
+any number of expressions, directly in the language instead of as a primitive:
+<test 10>
+    (list)          => nil
+    (list 1)        => (1)
+    (list 1 2)      => (1 2)
+    (list 1 2 3)    => (1 2 3)

@@ -1,0 +1,28 @@
+(include 'syntax)
+(define test1 (lambda (x)
+        (if (= x 1) 'one
+                    (if (= x )))))
+(define test1 (lambda (x)
+        (cond 
+            ((= x 1) 'one)
+            ((= x 2) 'two)
+            ((= x 3) 'three)
+            (1       'unkown)
+        )
+))
+
+    (test1 1);;one
+    (test1 2);;two
+    (test1 3);;three
+    (test1 4);;unknown
+
+(define test2 (lambda (A B C) 
+    (let ((a A) (b B) (c C))
+    (* a (+ b c)))
+))
+
+    (test2 6 3 4);;42
+    (test2 1 1 1);;2
+    (test2 1 2 3);;5
+    (test2 6 4 2);;36
+

@@ -1,0 +1,110 @@
+Graduate Research Consultation Project
+======================================
+
+9.  Conditional expressions, arithmetic expressions
+---------------------------------------------------
+
+The "define" function we saw last time is special.  Unlike an arithmetic
+function it does not evaluate all of its arguments before it performs its
+operation.  Specifically, the first argument (the name of the variable being
+defined) is not evaluated.
+
+An arithmetic operator such as "+" or "*" evaluates all of its operands before
+it is applied to their values.  Our arithmetic functions should behave the same
+way.
+
+Let's modify eval() so that when evaluating a Cell we will consider all the
+'special' functions (such as "define") first.  If the function is not special
+then we can evaluate all the arguments before considering which 'normal'
+function (such as "+") is being applied to them.  It will help to define
+another function apply() that applies a normal function to a list of (already
+evaluated) arguments.
+
+In pseudo-code:
+
+    eval(obj) =
+        ... deal with nil, integers, symbols ...
+        if obj is a Cell:
+	    let func = car(obj)
+	    let args = cdr(obj)
+	    if func is "define" then define a new global variable and return
+	    ... similarly for the other 'special' functions ...
+	    evaluate every argument in args
+	    return apply(func, args)
+
+    apply(func, args) =
+	if func is "+": return the sum of all the args
+	if func is "*": return the product of all the args
+	... similarly for the other 'normal' functions ...
+	generate an error: unknown function
+
+To evaluate every argument in args it will help to write a function
+evlist(list) that calls eval() on each element in the list and returns a new
+list holding all the results.
+
+Write just enough of apply() to implement the function "+" which sums its
+arguments and returns the result.  It is OK for this function to accept exactly
+two arguments.  Your program should now be able to evaluate these expressions:
+
+    input			output
+    -----			------
+    (+ 3 4)             	7
+    (+ (+ 1 2) (+ 3 4))         10
+
+Add the functions "*" and "-" to apply() and verify that:
+
+    input			output
+    -----			------
+    (* (- 9 3) (+ 3 4))		42
+
+Relational operators such as "<" perform tests on values and return a result of
+either 'true' or 'false'.  Implement "<" as a normal function in apply().  Use
+the value nil to represent 'false' and the symbol "t" to represent 'true'.
+Verify that:
+ 
+    input			output
+    -----			------
+    (< 2 4)        		t
+    (< 3 4)        		t
+    (< 4 4)        		nil
+    (< 5 4)        		nil 
+The next logical step is to add a conditional expression to your language.  Add
+another special function
+
+    (if condition consequent alternate)
+
+to eval() that uses the condition to control which of consequent (condition is
+true) or alternate (condition is false) is evaluated and returned.  (It is
+important that only one of the consequent or alternate is evaluated, and this
+conditional evaluation of an argument is why "if" must be a special function.)
+Consider nil as representing 'false' and any other value as representing
+'true'.  Verify that:
+
+    input			output
+    -----			------
+    (if 1 2 3)			2
+    (if () 2 3)			3
+
+Note that if you use car() and cdr() to 'unpack' the arguments then your "if" function
+will behave nicely when some or all of the arguments are missing:
+
+    (if 1 2)			=> 2
+    (if () 2)			=> nil
+    (if 1)			=> nil
+    (if ())			=> nil
+    (if)			=> nil
+
+You should now be able to evaluate programs such as this:
+
+    (define a 3)                => 3
+    (define b 4)                => 4
+    (if (< a b) a b)		=> 3
+    (define a 5)                => 5
+    (if (< a b) a b)		=> 4
+
+The next step will add user-defined functions to the language so that we can
+finally write and evaluate the "factorial" function.
+
+
+
+

@@ -1,0 +1,154 @@
+Graduate Research Consultation Project
+======================================
+
+12. Optimising global variables and the 'lambda' special form
+-------------------------------------------------------------
+
+Two inefficiencies remain in our evaluation mechanism.  First, the primitive
+functions and special forms are associated with global variables that are found
+using 'assoc', which searches the entire list of local and global variables
+every time.  Second, the 'lambda' form is still detected by comparing symbols
+rather than using the more efficient mechanism of detecting a type (as is now
+done with Primitive and Special).  Let's fix both of these.
+
+*** Optimising global variables
+
+The read-eval-print loop passes the 'globals' to eval() as the environment in
+which each top-level expression is evaluated.  This gives those expressions
+access to all the global variables.  As the number of global (and local)
+variables increases, the length of that association list grows, assoc() takes
+longer, and computation slows down.
+
+To fix this we can store the global value of a variable directly in its Symbol
+object.  A couple of trivial changes are needed to accomplish this.
+
+We need to add an 'oop value;' member to Symbol objects.  In newSymbol() we can
+leave this set to 0, to indicate that the variable has no global value.
+
+The define() function (and perhaps spec_define()) can then be modified to store
+the global value of a variable directly in the Symbol that names the variable.
+
+Finally, when eval() encounters a Symbol we have to check for a value in two
+phases.  First, search the 'env' using assoc() to look for a local definition
+that shadows the global definition.  If one is found, return the 'd' part of
+the association, just as before.  If not, check the Symbol.value field of the
+name and if it is non-zero return it as the global value of the variable.
+Otherwise the variable is undefined and an error can be reported.
+
+The 'globals' variable is now redundant and you can remove it, passing 'nil' as
+the environment to eval() in the read-eval-print loop.
+
+Verify that the factorial example still works after making these changes.
+
+
+
+
+
+
+
+
+
+*** Optimising user-defined (lambda ...) functions
+
+User-defined functions are still represented very crudely as lists that begin
+with the symbol 'lambda'.  Let's create a value type to represent the result of
+evaluating '(lambda ...)' expressions.  This is a kind of 'finalisation' of the
+lambda expression and so we will call the new type 'Closure'.  (One of the
+definitions of closure is, "a thing that closes or seals something, such as a
+cap or zipper.")
+
+
+
+When evaluating a user-defined function we are interested in the parameter list
+(to associate with the actual argument values) and the expressions in the body
+of the function.  A Closure will there have to remember those two things.
+
+
+
+Define the type, add it to Object, write the constructor
+
+    oop newClosure(oop parameters, oop expressions)
+
+and two accessor functions
+
+    oop Closure_parameters(oop obj)
+    oop Closure_expressions(oop obj)
+
+and then teach print() how to display a Closure.  (Perhaps printing something
+like "<Closure.(x y z)>" where "(x y z)" are the parameters stored in the
+Closure is enough for now.)
+
+
+Modify spec_lambda() so that it returns a new Closure object, storing the
+parameters and expressions retrieved from its 'args'.
+
+
+Modify apply() to remove the explicit detection of a list starting with
+'lambda' and instead check for a Closure object.  The handing of parameters and
+evaluation of the function body can remain almost, if not entirely, unchanged.
+applyを修正して、lambdaから始まる検知されたリストを削除し、代わりにClosure objをチェックする。
+
+
+Verify that your factorial example still works.
+
+// define
+// (define f (lambda (x y) (+ x y)))
+
+// before
+// obj type: cell
+// storing : (lambda (x y) (+ x y))
+// f ->
+
+// after
+// obj type: lambda
+// storing : ((x y) (+ x y))
+// f ->
+
+(define f (lambda (x) (+ x x)))
+<Closure.((+ x x))> <(x)>((x) (+ x x))
+(f 5)
+func: <Closure.((+ x x))> <(x)>((x) (+ x x))
+args: (5)
+env :nil
+
+    oop newenv = pairlist(cadr(func),args,env);
+    oop newfunc = cddr(func);
+    while(cdr(newfunc)!=nil){
+        eval(car(newfunc),newenv);
+        newfunc = cdr(newfunc);
+    }
+    return eval(car(newfunc),newenv);
+
+before
+    (f 5)
+    eval cell               (f 5)
+    appy symbol             apply(eval(f 5))
+    eval symbol             f -> (lambda ....)
+    apply cell              ((lambda ...) 3 4 5)
+    eval  cell              (+ a b)
+
+after
+    (f 5)
+    eval cell               (f 5)
+    appy symbol             apply(eval(f 5))
+    eval symbol             f -> (lambda ....)
+    apply cell              ((lambda ...) 3 4 5)
+    eval  cell              (+ a b)
+
+/*
+    ---------------------------------------------------------------------
+*/
+*** Bonus: better printing of Primitives, Specials, and user-defined functions
+
+Currently these are printed as hexadecimal addresses or, in the case of
+Closures, as just the parameter list.  However, many of these values will be
+associated with global variables and it would be far better to use their 'real'
+names.  This is trivial to arrange...
+
+Add a member 'oop name;' to each of the three types.  In define(name, value)
+check the type of value and if it is Primitive, Special, or Closure then set
+the 'name' field of the value object accordingly.  (Your spec_define() should
+already be calling define() to set the value of a variable and so should not
+need to change.)  In print() use the same 'name' field of a Primitive, Special,
+or Closure to display the Symbol that has been associated with.  (If the name
+field is 'nil' then you can use the original printed representation instead.)

@@ -1,0 +1,6 @@
+(define calc (lambda ()
+            (lambda (self)
+                (def x 1)
+                (+ x x))))
+(define sakana (calc))
+(sakana)

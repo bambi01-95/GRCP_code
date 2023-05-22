@@ -1,0 +1,89 @@
+Graduate Research Consultation Project
+======================================
+
+8.  Defining new variables
+--------------------------
+
+Lists are used to represent a function (such as an arithmetic operator) being
+applied to a list of arguments.  Some functions perform more complex
+operations, such as creating user-defined functions or defining new variables.
+For example, a short program that defines two variables and then accesses them
+will look like this:
+
+    program		output
+    -------		------
+    (define a 42) 	42
+    (define b 666)	666
+    a	      		42
+    b			666
+    c			error: undefined variable
+
+To illustrate how lists are evaluated we will detect a list whose function name
+(first element) is the symbol "define" and interpret it as a variable
+definition, as shown above.  The list
+
+    (define name value)
+
+will therefore add an association (name . value) to the global variables.
+
+A couple of functions will be useful to help us implement this.  Write a
+function
+
+    oop car(oop obj)
+
+that returns the "a" part of obj, if obj is a Cell.  If obj is not a Cell then
+"car" should return nil.  (The name "car" can be thought of as "Contents of A
+paRt".)  Write another function
+
+    oop cdr(oop obj)
+
+that does the same thing for the "d" part of obj ("Contents of D paRt").  If
+you want to test this then:
+
+    obj		car(obj)	cdr(obj)
+    ---		--------	--------
+    nil		nil		nil
+    42		nil		nil
+    foo		nil		nil
+    ()		nil		nil
+    (1)		1		nil
+    (1 2)	1		(2)
+    (1 2 3)	1		(2 3)
+
+A very useful way to think of these functions is that "car" returns the first
+element of a list (the 'head' of the list) and "cdr" returns the rest of the
+list after the first element (the 'tail' of the list).
+
+In eval() we can now start to evaluate the special function "define".  Before
+printing an error message about not being able to evaluate a Cell, use "car" to
+obtain the first element (the function being applied).  If it is the symbol
+"define" then we are expecting a list containing "(define name value)" where
+name is any symbol and value is any expression.  Evaluate this as follows:
+
+1. Use combinations of car() and cdr() to extract the name and value parts of
+   the expression.
+
+2. Check that name is a Symbol.  If not, generate an error message and exit.
+
+3. Evaluate the value expression (by calling eval() recursively).
+
+4. Create a Cell containing a new association (name . value) and add the
+   association to the front of the list stored in the variable "globals" (this
+   will require creating a second Cell to add an element to the front of the
+   globals list).
+
+5. Return value as the result of evaluating the list.
+
+Your read-eval-print program should now be able to process the following small
+program:
+
+    input		output
+    -----		------
+    (define a 42) 	42
+    (define b 666)	666
+    a	      		42
+    b			666
+    c			error: undefined variable
+
+You can now remove the part of main() that creates pre-defined variables "foo",
+"bar", and "baz" in the globals list, and initialise globals to nil instead.

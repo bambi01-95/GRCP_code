@@ -1,0 +1,74 @@
+Graduate Research Consultation Project
+======================================
+
+7.  Evaluating Symbols as variables
+-----------------------------------
+
+A variable is a named value.  The association between a name and a value
+requires a 2-tuple.  A Cell is the perfect structure for this.  An association
+between the variable name "foo" and the value 42 will be represented as the
+Cell:
+
+    (foo . 42)
+
+A program will typically use many variables.  To store the names and
+values of many variables we can make a list of these association
+Cells, called an association list.  The association list for the
+variables "one", "two", and "three" whose values are 1, 2, and 3, will
+look like this:
+
+    ((one . 1) (two . 2) (three . 3))
+
+Write a function
+
+    oop assoc(oop name, oop alist)
+
+that searches the association list alist to find the Cell whose "a"
+part matches the name.  The assoc() function should return the Cell
+that is has found, or nil to indicate that name was not found in the
+alist.  This lets the caller distinguish between "name not found"
+(assoc() returns nil) and "name associated with the value nil"
+(assoc() returns a Cell whose "a" part is name and whose "d" part is
+nil).
+
+To test your assoc() function you can create a list containing several
+associations
+
+    oop alist = newCell(newCell(newSymbol("foo", newInteger(1))),
+                newCell(newCell(newSymbol("bar", newInteger(2))),
+                newCell(newCell(newSymbol("baz", newInteger(3))),
+			nil)));
+
+and then use assoc() to search alist for them:
+
+    println(assoc(newSymbol("foo"), alist)); // -> (foo . 1)
+    println(assoc(newSymbol("bar"), alist)); // -> (bar . 2)
+    println(assoc(newSymbol("baz"), alist)); // -> (baz . 3)
+    println(assoc(newSymbol("qux"), alist)); // -> nil
+
+We can now evaluate a Symbol properly by looking it up in an association list
+holding all the global variables.
+
+Create a global variable
+
+    oop globals = 0;
+
+and initialise it in main() to contain some associations (such as those shown
+above).  Modify eval() to handle a Symbol by looking it up in the globals using
+assoc().  If an association is found, return the "d" part.  If no association
+is found, print an error message saying that the Symbol is undefined as a
+variable.
+
+The read-eval-print loop in your program should now be able to evaluate symbols
+as variables, printing the values of any pre-defined global variables:
+
+    input	output
+    -----	------
+    nil		nil
+    ()		nil
+    0		0
+    42		42
+    foo		1
+    bar		2
+    baz		3
+    qux		error: undefined variable

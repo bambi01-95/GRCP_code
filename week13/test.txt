@@ -1,0 +1,262 @@
+;;;;test1
+    ;; (define bar (lambda (x) (- x 1)))
+    ;; (bar 43)
+
+;;;;test 2
+    ;; (define foo (lambda () (- x 1)))
+    ;; (define bar (lambda (x) (foo)))
+    ;; (bar 43)
+
+;;;;test 3
+    ;; (define foo
+    ;;   (lambda ()
+    ;;     (lambda () 42)))
+
+    ;; (define bar (foo))
+    ;; (bar)
+
+;;;;test 4
+    ;; (define foo
+    ;;   (lambda (n)
+    ;;     (lambda () n)))
+
+    ;; (define bar (foo 42))
+    ;; (bar)
+
+;;;;test 5 = 4
+    ;; (println 'test5)
+    ;; (define foo
+    ;;   (lambda (n)
+    ;;     (lambda () n)))
+
+    ;; (define bar (foo 42))
+    ;; (bar)
+
+;;;; test 6 <------------------
+    (println 'test6)
+    (define make-ctr
+      (lambda (n)
+        (lambda ()
+	  (setq n (+ n 1)))))
+
+    (define c (make-ctr 10))
+    (c);;11
+    (c);;12
+    (c);;13
+    (c);;14
+
+;;;;test 7
+    ;; (println 'test7)
+    ;; (define foo (lambda (x y z)
+    ;;   (println x)
+    ;;   (println y)
+    ;;   (println z)))
+
+    ;; (foo 1 2)       ;; 1 2 nil
+    ;; (foo 1 2 3 4)   ;; 1 2 3
+
+;;;;test 8
+    ;; (println 'test8)
+    ;; (define foo
+    ;;   (lambda (args)
+    ;;     (println args)))
+
+    ;; (foo)           ;;=> nil
+    ;; (foo 1)         ;;=> (1) † in this case, you cann't test 6. because para will be (1), not 1.
+    ;; (foo 1 2)       ;;=> (1 2)
+    ;; (foo 1 2 3)     ;;=> (1 2 3)
+    ;; (foo 1 2 3 4)   ;;=> (1 2 3 4)
+
+;;;;test 9
+    ;; (println 'test9)
+    ;; (define bar
+    ;;   (lambda (a b . c)
+    ;;     (println a)
+    ;;     (println b)
+    ;;     (println c)))
+
+    ;; (bar)           ;;=> nil nil nil
+    ;; (bar 1)         ;;=> 1 nil nil
+    ;; (bar 1 2)       ;;=> 1 2 nil
+    ;; (bar 1 2 3)     ;;=> 1 2 (3)
+    ;; (bar 1 2 3 4)   ;;=> 1 2 (3 4)
+
+;;;;test 10
+    ;; (println 'test10)
+    ;; (define list (lambda (.para) para))
+    ;; (list)          ;;=> nil
+    ;; (list 1)        ;;=> (1)
+    ;; (list 1 2)      ;;=> (1 2)
+    ;; (list 1 2 3)    ;;=> (1 2 3)
+
+
+
+
+
+;;     while(args!=nil){
+;;         oop arg = car(args);
+;;         if(eval(car(arg),env)==t)
+;;             return eval(cadr(arg),nil);
+;;         args = cdr(args);
+;;     }
+;;     return nil;
+
+;; (cond (( ) ) (( ) ) (() ))
+;; .condtiion -> ((( ) ) (( ) ) (( ) ))
+;; (define cond (lambda (.condition)
+;;             ))
+
+;;  cond       args
+;;           /      \
+;;          /        \
+;;         /\        /\
+;;        /  \      /  \
+;; (= x 0)  'zero  /\   \
+;;                /  \   \
+;;          (= x 1) 'one /\
+;;                      /  \
+;;                     't 'non-binary
+
+;;     (define bit
+;;       (lambda (b)
+;;         (cond
+;;       	  ((= x 0)    'zero)
+;;       	  ((= x 1)    'one)
+;;       	  ('t         'non-binary))))
+
+;;     (bit 0)		=> zero
+;;     (bit 1)		=> one
+;;     (bit 2)		=> non-binary
+
+
+
+
+
+
+
+
+
+;;;;test last -> not eval...
+    ;; (define list (lambda (.para) para))
+
+    ;; (define make-ctr
+    ;;   (lambda (n)
+    ;;     (list 
+    ;;       (lambda () (setq n (- n 1)))
+    ;;       (lambda () n)
+    ;;       (lambda () (setq n (+ n 1))) 
+            
+    ;;     )
+    ;; ))
+
+    ;; (define c (make-ctr 10))
+    ;; (c);;11
+    ;; (c);;12
+    ;; (c);;13
+    ;; (c);;14
+
+
+;; ;; original part
+
+;; ;; python ver
+;;     class Calc:
+;;         def __init__(self,x,y):
+;;             self.x = x
+;;             self.y = y
+;;         def add(self):
+;;             return self.x + self.y
+
+;;     foo = Calc(40,2);;
+;;     print(foo.add())
+
+;; ;; lisp ver     *"(== x y)" means that x and y are in same adress
+;;     (define calc (lambda (x y)
+;;                     (lambda (ope)
+;;                         (if (== ope 'add) (+ x y)
+;;                         ))))
+
+;;     (define foo (calc 40 2))
+;;     (foo 'add)
+
+;; make def that define pair in env
+    ;; (define f (lambda (self)
+    ;;                 (lambda ()
+    ;;                     (def a 10)
+    ;;                     (+ a a)
+    ;;                     )))
+    ;; (define ff (f))
+    ;; (ff)
+
+    ;; (define f (lambda (.self) 
+    ;;     (def a 1) 
+    ;;     (def b 3)
+    ;;     (+ a b))
+    ;; )
+    ;; (f)
+    
+;; using "def", you can add new pair into env that is local vairable.
+
+;; <-------------
+
+    ;; (define add (lambda (x y) (+ x y)))
+    ;; (define sub (lambda (x y) (- x y)))
+    ;; (define div (lambda (x y) (/ x y)))
+    ;; (define mul (lambda (x y) (* x y)))
+
+    ;; (define calc (lambda (x y)
+    ;;                 (lambda (ope)
+    ;;                     (if (== ope 'Add) (add x y)
+    ;;                     (if (== ope 'Sub) (sub x y)
+    ;;                     (if (== ope 'Dib) (div x y)
+    ;;                     (if (== ope 'Mul) (mul x y)
+    ;;                     'f)))))))
+
+    ;; (define sakana (calc 10 12))
+    ;; (sakana 'Add)
+
+
+
+;; ;; ;; <how to make cond in lisp.txt>
+;; ;;;; cond behaveir
+;;     (define bit
+;;       (lambda (b)
+;;         (cond
+;;       	  ((= x 0)    'zero)
+;;       	  ((= x 1)    'one)
+;;       	  ('t         'non-binary))))
+
+;;     (bit 0)		=> zero
+;;     (bit 1)		=> one
+;;     (bit 2)		=> non-binary
+
+;; ;;;; cond func define in c (week 10: for_lisp.c)
+;;     if(func==sym_cond){
+;;         while(args!=nil){
+;;             oop arg = car(args);
+;;             if(eval(car(arg),env)==t)
+;;                 return eval(cadr(arg),nil);
+;;             args = cdr(args);
+;;         }
+;;         return nil;
+;;     }
+;; ;;;; cond func defie in lisp
+;;     (define cond (lambda ()
+;;                     ))
+
+;;;; test 6
+    ;; (println 'test6)
+    ;; (define make-ctr
+    ;;   (lambda (n)
+    ;;     (lambda ()
+	;;   (setq n (+ n 1)))))
+
+    ;; (define c (make-ctr 10))
+    ;; (c);;11
+    ;; (c);;12
+    ;; (c);;13
+    ;; (c);;14
+
+;; cond is function for function. it means, its behaveir like test6 above
+;; (define cond (lambda ()
+;;             (lambda ...)))
+

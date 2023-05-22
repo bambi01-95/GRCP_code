@@ -1,0 +1,262 @@
+
+< Modyfy colsure env && allow mult para >
+
+GRCP-12's now main code allow 
+
+
+frist step
+
+(define foo (lambda () (+ x 1)))
+(define bar (lambda (x) (foo)))
+(bar 41)
+
+that txt code.
+because foo have same enviroment of bar and that cause in apply.case.closure: oop newenv = pairlist(para, args, env);
+like 
+bar -> eval(lambda (x) (foo x)) -> newenv = (n.42) -> eval(foo,(n.42))
+       eval(lambda (x) ((closure foo) x))
+
+however, in this foo's para x and bar's para x is not same.
+if it code are
+
+(define foo (lambda (x) (+ x 1)))
+(define bar (lambda (x) (foo x)))
+(bar 41)
+
+,it is OK that X though from bar to foo.
+
+therefore, apply.case.closure: oop newenv = pairlist(para, args, env)'s env should be nil.
+'
+second step
+
+making like func in class, that allow like
+
+(define foo (lambda (n)
+            (lambda ()  (+ 40 n))))
+
+(define bar (foo 40))
+
+(bar 40)
+
+code.
+if i make like these code, 
+class foo
+    int x 
+    func(){
+        return x
+    }
+
+bar = foo.new
+bar.x = 40
+bar.func
+
+
+(define foo (lambda (n)
+            (lambda (i)  (+ i n))))
+
+(define bar (foo 40))
+
+(bar 40)
+
+
+< allow mult para >
+(define f (lambda (x) ...))
+(f 1 2 3)
+x = (1 2 3)
+
+(define f (lambda (x y) ...))
+(f 1 2 3)
+x = 1
+y = (2 3)
+
+think how to allow mult para!!!
+
+
+focus func is
+
+oop newenv  = pairlist(Closure_parameters(func),args,func->Closure.environment);
+current code beheveir is
+(x y z) (1 2 3)
+((x 1) (y 2) (z 3))
+
+wanted code beheveir is
+(x) (1 2 3)
+((x (1 2 3)))
+
+and
+
+(x y) (1 2 3)
+((x 1) (y (2 3)))
+
+    current pairlist code is
+
+oop pairlist(oop names,oop values,oop tail){
+    if(Object_type(names)!=Cell)return tail;
+    oop name = names->Cell.a;
+    oop value = car(values);
+    return newCell(newCell(name,value),pairlist(names->Cell.d,cdr(values),tail));
+    //     (       (x 1)      ,        (    )                          )
+}
+
+* name = (x y)
+* value = (1 2 3)
+
+cdr(name)==nil 
+-> pair(name,value)
+
+† second
+
+oop pairlist(oop names,oop values,oop tail){
+    if(cdr(names)==nil)return newCell(newCell(car(names),values),tail);
+    oop name = car(names);
+    oop value = car(values);
+    return newCell(newCell(name,value),pairlist(cdr(names),cdr(values),tail));
+}
+
+
+
+o$(define f (lambda (x) (println x)))
+x$(f 1)
+(1)
+o(f 1 2 3)
+(1 2 3)
+
+o$(define f (lambda (x y) (println x) (println y)))
+x$(f 1 2 3)
+1
+(2 3)
+
+in this case, one parameter args is cell include one para.
+but it should be integer.
+
+(a b . c)
+((a ) (b ))
+()
+
+memo:
+    // if(Object_type(names)!=Cell)return tail;
+    // if(Object_type(cdr(names))!=Cell)
+    //     return (cdr(names)==nil)
+    //         ?newCell(newCell(car(names),values),tail)
+    //         :newCell(newCell(car(names),car(values)),newCell(newCell(cdr(names),cdr(values)),tail));
+
+
+
+;; ;; ;; <how to make cond in lisp.txt>
+;; ;;;; cond behaveir
+;;     (define bit
+;;       (lambda (b)
+;;         (cond
+;;       	  ((= x 0)    'zero)
+;;       	  ((= x 1)    'one)
+;;       	  ('t         'non-binary))))
+
+;;     (bit 0)		=> zero
+;;     (bit 1)		=> one
+;;     (bit 2)		=> non-binary
+
+;; ;;;; cond func define in c (week 10: for_lisp.c)
+;;     if(func==sym_cond){
+;;         while(args!=nil){
+;;             oop arg = car(args);
+;;             if(eval(car(arg),env)==t)
+;;                 return eval(cadr(arg),nil);
+;;             args = cdr(args);
+;;         }
+;;         return nil;
+;;     }
+;; ;;;; cond func defie in lisp
+;;     (define cond (lambda ()
+;;                     ))
+
+;;;; test 6
+    ;; (println 'test6)
+    ;; (define make-ctr
+    ;;   (lambda (n)
+    ;;     (lambda ()
+	;;   (setq n (+ n 1)))))
+
+    ;; (define c (make-ctr 10))
+    ;; (c);;11
+    ;; (c);;12
+    ;; (c);;13
+    ;; (c);;14
+
+;; cond is function for function. it means, its behaveir like test6 above
+(define cond (lambda ()
+            (lambda ...)))
+
+    while(args!=nil){
+        oop arg = car(args);
+        if(eval(car(arg),env)==t)
+            return eval(cadr(arg),nil);
+        args = cdr(args);
+    }
+    return nil;
+
+(cond (( ) ) (( ) ) (() ))
+.condtiion -> ((( ) ) (( ) ) (( ) ))
+(define cond (lambda (.condition)
+            ))
+
+            cond
+          /      \
+         /        \
+        /\        /\
+       /  \      /  \
+(= x 0)  'zero  /\   \
+               /  \   \
+         (= x 1) 'one /\
+                     /  \
+                    't 'non-binary
+
+
+-----------------------------------------------
+[def]
+> env = nil;
+
+name    addr
+--------------
+nil     0x00
+env     0x00
+
+code
+> env->type = Cell 
+
+env is copy of nil
+
+therefore, if you change env into Cell.
+> env->Cell.a = newCell(car(args),cadr(args));
+ => nil->Cell.a = :
+
+> env->Cell.d = nil;
+ => nil->Cell.d = nil;
+
+[self para]
+1>(lambda ()
+2>    (lambda ()))
+
+< not allow >
+para1= nil
+para2= nil
+env1 = pairlist(para1,nil)
+    -> env1 = nil
+env2 = pairlist(para2,env1)
+    ->env2 = pairlist(nil,nil)
+        ->env2 = nil
+< allow >
+para1= self
+para2= nil
+env1 = pairlist(para1,nil)
+    -> env1 = (self)
+env2 = pairlist(para2,env1)
+    ->env2 = pairlist(nil,self)
+        ->env2 = (self)
+
+para1= nil
+para2= self
+env1 = pairlist(para1,nil)
+    -> env1 = nil
+env2 = pairlist(para2,env1)
+    ->env2 = pairlist(self,nil)
+        ->env2 = (self)

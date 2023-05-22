@@ -1,0 +1,37 @@
+;;;;[ cond ] 
+    (define list (lambda args args))
+    (define make-cond (lambda (clause rest)
+                    (if (list? clause) 
+                        (list 'if (car clause) 
+                                (car (cdr clause))
+                                (make-cond (car rest) (cdr rest))
+                                )
+                    )
+        )
+    )
+     
+    (define-syntax cond (lambda (cond . args)
+                    (make-cond (car args) (cdr args))))
+
+;;;; [ let ]
+    (define para (lambda (args)
+            (if (list? args)
+                (cons (car (car args)) (para (cdr args)))
+            )
+        )
+    )
+
+    (define valu (lambda (args)
+            (if (list? args)
+                (cons (car (cdr (car args)))  (valu (cdr args)))
+            )
+        )
+    )
+
+    (define make-let (lambda (clause . exp)
+            (cons (cons 'lambda (cons (para clause) exp)) (valu clause))
+        )
+    )
+    
+    (define-syntax let (lambda (let . args)
+                    (make-let (car args) (car (cdr args)))))

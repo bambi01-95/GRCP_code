@@ -1,0 +1,127 @@
+(define a 10)
+(define b 11)
+(define c 12)
+
+
+(print 'cadr)
+(define cadr (lambda (obj)
+        (car (cdr obj))
+    )
+)
+
+
+(print 'pairlist)
+(define pairlist (lambda (names values tail)
+        (if (cell? names)
+            (cons (cons (car names) (car values)) (pairlist (cdr names) (cdr values) tail))
+            tail
+        )
+    )
+)
+
+(print 'evlist)
+(define evlist (lambda (list)
+        (if (cell? list)
+        (cons (eval (car list)) (evlist (cdr list)))
+        (eval list)
+        )
+    )
+)
+
+(print 'apply)
+(define apply (lambda (args)
+        (print 'apply)
+        (if (integer? (car args))
+            (println 'ApplyIntegerError)
+
+            (if (symbol? (car args))
+                (if (eq? (car args) '+)
+                    (+ (cadr args) (cadr (cdr args)))
+
+                    (if (eq? (car args) '-)
+                        (- (cadr args) (cadr (cdr args)))
+
+                        (if (eq? (car args) '*)
+                            (* (cadr args) (cadr (cdr args)))
+
+                            (if (eq? (car args) '/)
+                                (/ (cadr args) (cadr (cdr args)))
+
+                                (if (eq? (car args) '<)
+                                    (< (cadr args) (cadr (cdr args)))
+
+                                    (apply (cons (eval (car args)) (cdr args)))
+                                )     
+                            )               
+                        )
+                    ) 
+                )
+
+
+                (if (cell? (car args))
+                    ;; (println (car (car args))
+                    (if (eq? (car (car args)) 'lambda)
+                        (lambda (cadr args) (cadr (cdr args))) 
+
+                        (println 'this);(apply (eval (car args) ) )
+                    )
+
+                    (println 'ApplyError)
+                )
+            )
+        )
+    )
+)
+
+
+(print 'eval)
+(define eval (lambda (args )
+        (if (integer? args)
+            args
+            
+            (if (symbol? args)
+                (assoc args)
+
+                (if (cell? args)
+                    (if (eq? (car args) 'if)
+                        (if (eval (cadr args))
+                            (cadr (cadr (cdr args)))
+                            (cadr (cadr (cdr (cdr args))))
+                        ) 
+
+                        (if (eq? (car args) 'define)
+                            (define (cadr args)  (cadr (cdr args)))
+
+                            (if (eq? (car args) 'while)
+                                (while (cadr args) (cadr (car args)))
+
+                                (apply args)
+                            )
+                        )
+                    )
+
+                    (println 'EvalError)
+                )
+            )
+        )
+    )
+)
+(println 'Start)
+
+;; (eval '123);;integer error
+;; (eval 'asdf);;asdf
+;; (eval '(if (< 2 3) 't 'f));;t
+;; (eval '(if (< 3 2) 't 'f));;f
+;; (evlist (list a b c))
+;; (pairlist '(a b c) '(1 2 3) '(3 4 5))
+;; (eval '(define f (lambda (n) (+ n n))))
+;; (eval '(define a 10))
+;; (eval (f 4))
+
+(eval '(define f (lambda (n)
+            (if (< n 2)
+                1
+            (* n (f (- n 1)))))))
+
+(eval '(f 5))
+(println 'ReachTheEnd)

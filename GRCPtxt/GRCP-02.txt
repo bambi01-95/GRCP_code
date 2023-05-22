@@ -1,0 +1,113 @@
+Graduate Research Consultation Project
+======================================
+
+2.  Lists
+---------
+
+Our data and program representation needs to make lists of values.  We will add
+a new type that stores a pair (2-tuple) of values.  Let's call this new type of
+object a "Cell".
+
+Cells can be used for many things.  They can be used to associate a name with a
+value, and we will soon use Cells to store variable values.
+
+            +-------+-------+
+    Cell:   |   o   |   o   |
+            +---|---+---|---+
+                |       |
+                |       +--------+
+                |                |
+                V                V
+            +-------+        +-------+
+    Symbol: |  "x"  |   any: | value |
+            +-------+        +-------+
+
+Linked lists can also be made from a sequence of Cells.  Each link in a list
+has to store a data value (the "element" at that position in the list) and the
+next link in the list.  A Cell is perfect for storing these two pieces of
+information.  A list of three integers "(1 2 3)" would be stored as three
+Cells, arranged like this:
+
+
+             +-----+-----+    +-----+-----+    +-----+-----+
+    Cells:   |  o  |  o--+--->|  o  |  o--+--->|  o  | nil |
+             +--|--+-----+    +--|--+-----+    +--|--+-----+
+                |                |                |
+                V                V                V
+              +---+            +---+            +---+
+    Integers: | 1 |            | 2 |            | 3 |
+              +---+            +---+            +---+
+
+The third Cell is the last link in this list and so there is no "next link" to
+store in it.  We will use the Undefined value "nil" to indicate the absence of
+another link in the list.
+
+The traditional names for the two values stored in a call are the 'A' part and
+the 'D' part.  In C the corresponding structure would therefore be:
+
+struct Cell {
+    int     type;  // Cell      (an enumeration constant)
+                   // +-----+
+    Object *a;     // |  a  |   = association name, list data element, etc.
+    	   	   // +-----+
+    Object *d;     // |  d  |   = association value, next Cell in list, etc.
+    	   	   // +-----+
+};
+
+Add a new type Cell to your object system, along with the corresponding
+constructor and accessor functions:
+
+    Object *newCell(Object *a, Object *d); 	    // create a new cell
+
+    Object *Cell_getA(Object *cell);       	    // fetch  the A part
+    void    Cell_setA(Object *cell, Object *value); // modify the A part
+
+    Object *Cell_getD(Object *cell);                // fetch  the D part
+    void    Cell_setD(Object *cell, Object *value); // modify the D part
+
+Extend the print() function so that it can also print Cell objects.
+Each cell should be printed as
+
+    (A . D)
+
+i.e., an open parenthesis "(", the A value, a dot ".", the D value,
+and a close parenthesis ")".  (Print the A and D parts by calling
+print() recursively.)  For example, if a Cell contains the symbol
+"foo" in the A part and the integer 42 in the D part, it should be
+printed as
+
+    (foo . 42)
+
+and our list of three integers, as shown above, should be printed like
+this:
+
+    (1 . (2 . (3 . nil)))
+
+
+Here's a simple test program to demonstrate Cells.  (The part
+following "=>" in the comments shows exactly what should be printed.)
+
+
+typedef Object *oop;
+
+int main()
+{
+    oop nil = newObject(Undefined);
+
+    // a "variable" as an association between an name and a value
+
+    oop var = newCell(newSymbol("foo", newInteger(42)));
+
+    println(var);                        // => (foo . 42)
+
+    // a "list" as a sequence of Cells
+
+    oop list = newCell(newInteger(1),
+    	       newCell(newInteger(2),
+    	       newCell(newInteger(3),
+	       nil)));
+
+    println(list);                       // => (1 . (2 . (3 . nil)))
+
+    return 0;
+}

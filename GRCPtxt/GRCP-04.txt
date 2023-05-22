@@ -1,0 +1,220 @@
+Graduate Research Consultation Project
+======================================
+
+4.  Completing the read() and print() functions
+-----------------------------------------------
+
+Two details need attention before we can start to write and evaluate programs.
+First, we need to read and print lists in a more convenient way, without all
+the explicit "." characters.  Second, when creating a new symbol we should
+reuse an existing symbol, with the same name, if possible.
+
+Let's do the easy one first.  Recall that a list is a chain of Cells, linked
+through their "d" parts with "nil" at the end of the list.  Modify print() so
+that when printing a Cell it will avoid printing " . (" as long the "d" part of
+the cell is another cell.  In other words, the following inputs will produce
+the indicated output when print()ed:
+
+    input                           printed as
+    -----                           ----------
+    (1 . (2 . (3 . nil)))           (1 2 3)
+    (1 2 3)                         (1 2 3)
+    (1 . (2 . (3 . four)))          (1 2 3 . four)
+    (1 2 3 . four)          	    (1 2 3 . four)
+
+Next modify read() so that it can read the list using the same representation
+that is produced by print() for each of the above examples.
+
+    input and output                internal cell structure of the list
+    ----------------                -----------------------------------
+    (1 2 3)                 	    (1 . (2 . (3 . nil)))
+    (1 2 3)		    	    (1 2 3)
+    (1 2 3 . four)	    	    (1 . (2 . (3 . four)))
+    (1 2 3 . four)	    	    (1 2 3 . four)
+
+Make sure your read() function is completely general, always calling itself
+recursively to read an object.  For example:
+
+    input                           output
+    -----                           ------
+    (1 . nil)                 	    (1)
+    (1 . 2)                 	    (1 . 2)
+    ((1) . nil)                     ((1))
+    ((1) . (2 . ((3))))             ((1) 2 (3))
+
+This requires a little more "parsing" than we have been doing so far.
+If you think about the general form of a list, it is something like this:
+
+    a '(', which is skipped over
+    while the next char is not '.' or ')': read() an "element" object
+    if the next char is '.': skip it and read a "last" object
+                  otherwise: set "last" to nil
+    if the next char is not ')': print an error message
+
+The result should be a list of Cells linked through their "d" values
+and whose "a" values are the "element" objects, with the final "d"
+value of the last Cell being the "last" object.  (If there is no '.'
+at the end of the list, the default "last" object will be nil.)
+
+Constructing the list of element objects can be tricky.  One approach
+(my favourite) is to construct a "list" of element objects in reverse
+order (pushing each element on the front of the list).  At the end of
+the list, reverse the elements in the "list" using "last" as the final
+"d" value.  With a little thought it is easy to write a function
+
+    revlist(oop list, oop last)
+
+that reverses the elements of list, using last as the final "d" value,
+without allocating any additional Cells.  (This is called an "in-place
+list reversal" because no extra memory is used.  Try to solve this on
+your own.  If you cannot then there is a sample implementation of
+revlist() at the end of this section.)
+
+For example, starting with list = nil and last = nil, the input
+
+    (1 2 3 . 4)
+
+will result in
+
+    list = (3 . (2 . (1 . nil)))   # list = newCell(element, list)
+    last = 4
+
+and calling revlist(list, last) will produce the structure
+
+    (1 . (2 . (3 . 4)))
+
+which is the list we want.
+
+What should be printed for the input "()"?  Why?
+
+What should be printed for the input "( . 42)"?  Why?
+
+Make sure your read() function handles both of these correctly.
+
+Your read-print loop should now be able to read and print the entire example
+that was shown at the start of this project.  Place the following in a text
+file:
+
+    (define factorial
+      (lambda (n)
+        (if (< n 2)
+	    1
+	    (* n (factorial (- n 1))))))
+
+    (factorial 5)
+
+Run your read-print program with input redirected from the text file (I called
+mine "factorial.txt".)  The output should be the same program but with all
+formatting removed:
+
+    piumarta:~$ ./grcp-04 < factorial.txt
+    (define factorial (lambda (n) (if (< n 2) 1 (* n (factorial (- n 1))))))
+    (factorial 5)
+
+The read() and print() functions are now complete.
+
+
+Appendix: The revlist() function
+--------------------------------
+
+If the input is (1 2 3) then the read() function will collect the
+elements in reverse order, (3 2 1).  It then calls revlist() to put
+them in the correct order, like this:
+
+    revlist( (3 2 1) , nil )
+             ^^^^^^^   ^^^
+             list      the desired final 'd' part of the result
+             elements
+             to be reversed
+
+For a "dotted list" such as (1 2 3 . 4), it will call:
+
+    revlist( (3 2 1) , 4 )
+             ^^^^^^^   ^^^
+             list      the desired final 'd' part of the result
+             elements
+             to be reversed
+
+Revlist is short and you can easily construct it "from first
+principles".  Stating the problem in a general manner,
+
+    oop revlist(oop list, oop tail)
+
+should reverse the order of the elments in 'list', adding them to the
+front of the object (or list) in 'tail'.
+
+Note that at each iteration of the reversal, the first element in
+'list' should become the first element in 'tail'.  This makes it easy
+to describe the solution like this: revlist(list, tail) should
+repeatedly remove the first element of 'list' and push it onto the
+front of 'tail'.  When 'list' becomes empty, 'tail' will contain the
+original elements of 'list', in reverse order, which is the result we
+want.  In pseudo-code:
+
+    revlist(list, tail) =
+        while 'list' is not empty
+            remove the first Cell from 'list'
+	    push the removed Cell onto the front of 'tail'
+        return tail
+
+SPOLER ALERT!  Stop reading now if you want to try to implement this
+function on your own.  Otherwise, scroll down to see my sample
+implementation.
+
+|
+|
+| down
+|
+V
+
+|
+|
+| down
+|
+V
+
+|
+|
+| down
+|
+V
+
+|
+|
+| down
+|
+V
+
+|
+|
+| here it is
+|
+V
+
+oop revlist(oop list, oop tail)
+{
+    while (Object_type(list) == Cell) { // list not empty
+	oop cell = list;      		// get the first cell in list and
+	list = list->Cell.d;  		//   remove it from list
+	cell->Cell.d = tail;  		// make cell be the new first Cell
+	tail = cell;          		//   in tail
+    }
+    return tail;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

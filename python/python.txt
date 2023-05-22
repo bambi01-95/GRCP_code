@@ -1,0 +1,35 @@
+x = 4
+-> (x = 4)
+    -> (= x 4)
+
+y = 3
+-> (y = 3)
+    -> (= y 3)
+
+def add(x,y):
+    return x + y
+->(def add (lambda (x y) (+ x y)))
+
+add(x,y)
+->(add x y)
+
+class ope(self,x,y):
+    def __init__():
+        x = self.x
+        y = self.y
+    def mult()
+        return x * y
+
+(define ope (lambda (self x y)
+            (define mult (lambda () (* x y)))))
+(define sakana (ope 3 4))
+(sakana mult x y)
+
+
+
+
+初めをcellスタートにすれば良い。
+でも、
+x = 4
+def add...
+では、セルのfuncの位置が違う
