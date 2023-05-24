@@ -1,0 +1,12 @@
+(define list (lambda x x))
+(print 'a)
+(define a 10)
+(print 'b)
+(define b 0.1)
+(print 'c)
+(define c .112)
+(print 'd)
+(define d 1.000)
+
+(+ a b)
+(+ b c)
