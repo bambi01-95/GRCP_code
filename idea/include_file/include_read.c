@@ -222,19 +222,7 @@ oop cadr(oop obj);
 oop assoc(oop obj,oop alist);
 oop apply(oop,oop,oop);
 void println(oop);
-int nextchar(FILE *fp)
-{
-    int c = fgetc(fp);
-    while (isspace(c)||c==';'){
-        if(c==';'){
-            while(c!='\n'){
-                c = fgetc(fp);
-            }
-        }
-        c = fgetc(fp);
-    }
-    return c;
-}
+
 
 oop read(FILE *fp) // read stdin and return an object, or 0 if EOF
 {

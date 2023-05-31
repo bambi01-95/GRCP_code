@@ -1,0 +1,3 @@
+(define a 10)
+(define b 100)
+(define c 1000)

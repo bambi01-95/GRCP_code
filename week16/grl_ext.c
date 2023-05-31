@@ -256,57 +256,55 @@ oop cadr(oop obj);
 oop assoc(oop obj,oop alist);
 oop apply(oop,oop,oop);
 void println(oop);
-
-int nextchar(void)
+int nextchar(FILE *fp)
 {
-    int c = getchar();
+    int c = fgetc(fp);
     while (isspace(c)||c==';'){
         if(c==';'){
             while(c!='\n'){
-                c = getchar();
+                c = fgetc(fp);
             }
         }
-        else
-        c = getchar();
+        c = fgetc(fp);
     }
     return c;
 }
 
-oop read(void) // read stdin and return an object, or 0 if EOF
+oop read(FILE *fp) // read stdin and return an object, or 0 if EOF
 {
     int c;
-    c = nextchar();
+    c = nextchar(fp);
     if (isdigit(c) || c=='.') { // å
         int length = 0;
         char buf[32];
         int isDot = 0;
         while(isdigit(c) && length<sizeof(buf)-1){
             buf[length++] = c;
-            c = getchar();
+            c = fgetc(fp);
         }
         // float
         if(c == '.'){
             buf[length++] = c;
-            c = getchar();
+            c = fgetc(fp);
             isDot = 1;
             while(isdigit(c) && length<sizeof(buf)-1){
                 buf[length++] = c;
-                c = getchar();
+                c = fgetc(fp);
             }
         }
         // exponential
         if( c == 'e'){
-            c = getchar();
+            c = fgetc(fp);
             int sign = 0;
             int exlen = 0;
             char expo[8];
             switch(c){
                 case '-':sign = 1;
-                case '+':c=getchar();
+                case '+':c=fgetc(fp);
                 case '0' ... '9':{
                     while(isdigit(c) && length<sizeof(expo)-1){
                         buf[exlen++] = c;
-                        c = getchar();
+                        c = fgetc(fp);
                     }
                     // how to deal with...
                     // 100e-4???
@@ -319,7 +317,7 @@ oop read(void) // read stdin and return an object, or 0 if EOF
             }
         }
         buf[length] = 0;
-        ungetc(c,stdin);
+        ungetc(c,fp);
         if(isDot>0 && length>1){
             return newFloat(atof(buf));
         }
@@ -334,9 +332,9 @@ oop read(void) // read stdin and return an object, or 0 if EOF
         int length = 0;
         do {
             string[length++] = c;
-            c = getchar();
+            c = fgetc(fp);
         } while((isident(c) || isdigit(c)) && length < sizeof(string) - 1);
-        ungetc(c, stdin);
+        ungetc(c, fp);
         string[length] = '\0';
         if (!strcmp(string, "nil")) return nil;
         return newSymbol(string);
@@ -345,7 +343,7 @@ oop read(void) // read stdin and return an object, or 0 if EOF
         char string[64];
         int length = 0;
         int c;
-        while(length < sizeof(string) - 1 && ((c=getchar())!='\"')){
+        while(length < sizeof(string) - 1 && ((c=fgetc(fp))!='\"')){
             string[length++] = c;
         }
         string[length] = '\0';
@@ -353,45 +351,45 @@ oop read(void) // read stdin and return an object, or 0 if EOF
     }
     
     if(c=='`'){
-        oop list = read();
+        oop list = read(fp);
         return newCell(sym_quasiquote,newCell(list,nil));
     }
     if(c==','){
-        c = nextchar();
+        c = nextchar(fp);
         if(c=='@'){
-            oop list = read();
+            oop list = read(fp);
             return newCell(sym_unquote_splicing,newCell(list,nil));
         }
-        ungetc(c,stdin);
-        oop list = read();
+        ungetc(c,fp);
+        oop list = read(fp);
         return newCell(sym_unquote,newCell(list,nil));
     }
 // 'a -> (quote a)
     if (c == '\''){
-        oop list = read();
+        oop list = read(fp);
         return newCell(sym_quote,newCell(list,nil));
     }
     if (c == '(') { // ( a b (a b))
         oop list = nil;
-        c = nextchar();
+        c = nextchar(fp);
         while (c != ')' && c != '.') {
-            ungetc(c, stdin);
-            oop obj = read();
+            ungetc(c, fp);
+            oop obj = read(fp);
             if (!obj) {
             fprintf(stderr, "EOF while reading list\n");
             exit(1);
             }
             list = newCell(obj, list); // push element onto front of list
-            c = nextchar();
+            c = nextchar(fp);
         }
         oop last = nil;
         if (c == '.') {
-            last = read();
+            last = read(fp);
             if (!last) {
             fprintf(stderr, "EOF while reading list\n");
             exit(1);
             }
-            c = nextchar();
+            c = nextchar(fp);
         }
         if (c != ')') {
             fprintf(stderr, "')' expected at end of list\n");
@@ -1240,6 +1238,7 @@ oop spec_and(oop args,oop env){
         if(result==nil)return nil;
         args = args->Cell.d;
     }
+    printf("true\n");
     return result;
 }
 oop spec_or(oop args,oop env){
@@ -1358,7 +1357,15 @@ oop define(oop name, oop value){
     MAIN
     
 ////////////////////////////////////////////////////////*/
-
+int extension(char* name){
+    int len = strlen(name);
+    int index = 0;
+    for(;index<len;index++){
+        if(name[index]=='.')return index;
+    }
+    fprintf(stderr,"no extension\n");
+    exit(1);
+}
 int main(int argc,char **argv)
 {
     nil        	= newObject(Undefined);
@@ -1422,26 +1429,49 @@ int main(int argc,char **argv)
     define(newSymbol("println"),newSpecial(spec_println));
     define(newSymbol("let"),    newSpecial(spec_let));
     define(newSymbol("setq"),   newSpecial(spec_setq));
+    FILE *fp = NULL;
+    //argc is number of argumennts
+    //argv[x] is argument at x.
+    int option = 1;
+    if(argc>0){
+        if(strcmp(argv[1],"-r")==0)option = 0;
+        else if(strcmp(argv[1],"-b")==0)option = 1;
+        else{
+            fprintf(stderr,"ERROR: first argument should be option\n-r: only read a file\n-b: read a file and standerd input\n");
+            exit(1);
+        }
+        char* file_name = argv[2];
+        int dot = extension(file_name) + 1;
+        char* ext = "grl";
+        if(dot<1){
+            fprintf(stderr,"extension only is not allowed\n");
+            exit(1);
+        }
+        for(int i=0;i<3;i++){
+            if(file_name[dot+i]!=ext[i]){
+                fprintf(stderr,"no .grl\n");
+                exit(1);
+            }
+        }
+        fp = fopen(file_name,"r"); // read only
+        if(fp==NULL){
+            fprintf(stderr,"OPEN ERROR: %s\n",file_name);
+            exit(1);
+        }
+        while(1){
+            oop obj = read(fp);
+            if(!obj)break;
+            eval(obj,globals);
+        }
+    }
 
-    for (;;) { // read-print loop
-        oop obj = read();
-        if (!obj) break;
-        println(eval(obj,globals));
+    if(option==1){
+        fp = stdin;
+        for (;;) { // read-print loop
+            oop obj = read(fp);
+            if (!obj) break;
+            println(eval(obj,globals));
+        }
     }
     return 0;
 }
-//not/ and/ or logic
-// (and (= ...))
-
-
-//expand(): apply syntax after read / before eval()
-//これを木曜日に行う
-
-//includ file: that make our lang. as nor normal lang.
-//これを水曜日に行う
-
-//quaote etc..: that is ... very complex...
-//これを金曜日に行う
-
-//土日にw15の終わらなかった/簡潔ではないものをとく
-//+論文を読む
