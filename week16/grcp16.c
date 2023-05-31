@@ -1233,7 +1233,27 @@ oop spec_setq(oop args,oop env){
     return value;
 }
 
-
+oop spec_and(oop args,oop env){
+    oop result = sym_t;
+    while(Object_type(args)==Cell){
+        result = eval(args->Cell.a,env);
+        if(result==nil)return nil;
+        args = args->Cell.d;
+    }
+    return result;
+}
+oop spec_or(oop args,oop env){
+    oop result = nil;
+    while(Object_type(args)==Cell){
+        result = eval(args->Cell.a,env);
+        if(result!=nil)return result;
+        args = args->Cell.d;
+    }
+    return result;
+}
+oop spec_not(oop args,oop env){
+    return (eval(args,env)==nil)?t:nil;
+}
 /*////////////////////////////////////////////////////////
 
     APPLY EVAL DEFINE
@@ -1339,7 +1359,7 @@ oop expand(oop obj,oop env){
     
 ////////////////////////////////////////////////////////*/
 
-int main()
+int main(int argc,char **argv)
 {
     nil        	= newObject(Undefined);
 	t          	= newSymbol("t");
@@ -1388,6 +1408,9 @@ int main()
     define(newSymbol("define-syntax"),newSpecial(spec_define_syntax));
     define(newSymbol("if"),    newSpecial(spec_if));
     define(newSymbol("while"), newSpecial(spec_while));
+    define(newSymbol("and"), newSpecial(spec_and));
+    define(newSymbol("or"),newSpecial(spec_or));
+    define(newSymbol("not"),newSpecial(spec_not));
 
     define(newSymbol("quote"), newSpecial(spec_quote));
     define(newSymbol("quasiquote"),newSpecial(spec_quasiquote));//w15
@@ -1399,7 +1422,23 @@ int main()
     define(newSymbol("println"),newSpecial(spec_println));
     define(newSymbol("let"),    newSpecial(spec_let));
     define(newSymbol("setq"),   newSpecial(spec_setq));
-
+    FILE *fp = NULL;
+    //argc is number of argumennts
+    //argv[x] is argument at x.
+    for(int i=0;i<argc;i++){
+        char* file_name = argv[i];
+        fp = fopen(file_name,"r"); // read only
+        if(fp==NULL){
+            fprintf(stderr,"OPEN ERROR: %s\n",file_name);
+            exit(1);
+        }
+        while(1){
+            oop obj = read();
+            if(!obj)break;
+            eval(obj,globals);
+        }
+    }
+    fp = stdin;
     for (;;) { // read-print loop
         oop obj = read();
         if (!obj) break;
@@ -1407,7 +1446,18 @@ int main()
     }
     return 0;
 }
+//not/ and/ or logic
+// (and (= ...))
+
 
 //expand(): apply syntax after read / before eval()
+//これを木曜日に行う
+
 //includ file: that make our lang. as nor normal lang.
+//これを水曜日に行う
+
 //quaote etc..: that is ... very complex...
+//これを金曜日に行う
+
+//土日にw15の終わらなかった/簡潔ではないものをとく
+//+論文を読む

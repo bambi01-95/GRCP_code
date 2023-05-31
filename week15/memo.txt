@@ -1,0 +1,57 @@
+Graduate Research Consultation Project
+======================================
+
+15.1 Garbage Collection 0/2
+ø1    install boehmgc
+ø2    relloc to GC_malloc
+助けて。。。
+
+15.2 Primitives eval and apply 2/2
+†1    add prim_eval
+†2    add prim_apply
+
+15.3 Float data type 2/3
+†1    add float into type
+†2    add float into print
+†3    edit 4 ope that can calc float and integer
+floatのより良い定義の仕方は？
+(.1 .1)どのように扱った？
+
+15.4 String data type  2/2
+†1    Add string into type
+†2    Add string into print
+
+15.5 Useful primitives 9/15
+
+†1    (list? x)
+†2    (integer? x)
+†3    (float? x)
+†4    (string? x)
+†5    (symbol? x) 
+
+†6    (integer x)        
+†7    (float x)           
+†8    (symbol x)          
+†9    (string x)  
+set_qのように値（この場合X）自体を変えるのか、return値でconvertした値を返すのか
+
+†0    (concat x y)   
+PIUがやっていた方法ってどんなの？
+stringとsymbolの扱い方は？
+
+
+
+†3    (length x)         
+†4    (nth x n) 
+
+†1    (slice x a b)      
+xx2    (slice x a b c)   
+どういう意味
+†5    (set-nth x n i)   
+これもどういう意味？   
+
+
+gc 
+float
+SUB && DIV
+etc...

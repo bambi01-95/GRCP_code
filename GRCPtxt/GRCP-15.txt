@@ -1,0 +1,132 @@
+Graduate Research Consultation Project
+======================================
+
+15.1 Garbage Collection 0/2
+-----------------------
+
+Our system allocates objects but never frees them.  A long-running program will
+slowly but surely fill all available memory and then crash.
+
+Objects that can never again be used in any computation are called garbage.
+For example, after executing
+
+    (define x '(1 2 3))
+    (define x '(4 5 6))
+
+there no surviving references to the first list '(1 2 3).  It is now garbage.
+Just as your town would become overrun with garbage if the garbage collectors
+stop picking it up, memory becomes overrun with garbage objects unless they are
+collected and their memory returned to the pool of available, unused memory.
+The system component that performs this service is called a garbage collector
+(GC).
+
+Our language is simple and we could implement our own GC.  Instead we will use
+a GC library called the Boehm-Demers-Weiser garbage collector.  It
+automatically free()s any objects allocated by the program that have become
+unreachable and are therefore garbage.
+
+Download and install the library.
+
+    Linux:	apt install libgc-dev
+    Mac:	port install boehmgc
+    Win:	https://www.hboehm.info/gc/
+
+Include <gc.h> at the start of the program.  Replace the call to
+calloc()/malloc() in newObject() with a call to GC_malloc() instead.  (The
+newly allocated memory is guaranteed to be cleared to zero, just like calloc()
+does.)  Memory should now never fill up, no matter how long your program runs.
+
+
+
+
+15.2 Primitives eval and apply 2/2
+------------------------------
+
+Define two new primitives eval and apply.  Test them with:
+
+    (define f (lambda (x y) (eval y)))
+    (f 41 '(+ x 1))                    => 42
+
+    (apply * '(6 7))                   => 42
+
+
+
+
+15.3 Float data type 2/3
+--------------------
+
+Add a new object type Float to represent floating-point values.  Extend read()
+to understand floating point constants.  If you read one or more digits
+followed by '.' followed by zero or more additional digits then you should
+return a floating point value.  The easiest way to convert the input into a
+value is to collect all the characters in the floating point value in a buffer
+and then use 'double atof(char *text)' to convert the text into a floating
+point value.
+
+Extend print() to print floating-point values.
+
+Extend the arithmetic and relational primitives to handle mixed integer and
+floating-point arithmetic.  For the arithmetic operators, if all operands are
+integers then the result can be an integer.  If one or more are floating point
+then the result should be floating point.
+
+15.4 String data type  2/2
+---------------------
+
+Add a new object type String to represent string values.  Extend read() to
+understand string constants delimited by double quotes '"'.
+
+Extend print() to print string values.
+
+15.5 Useful primitives 9/15
+----------------------
+
+Define some useful primitives that manipulate your new value types.  Here are
+some suggestions:
+
+†    (list? x)
+†    (integer? x)
+†    (float? x)
+†    (string? x)
+†    (symbol? x)            return 't or nil depending on the type of x
+    	     		   (you could also implement a function (typeof x)
+			   that returns the integer value stored in the
+			   type field of the object, or a symbol naming the
+			   type, which makes defining these functions
+			   possible directly in our language)
+
+†    (integer x)            converts x (float or string) into an integer†
+†    (float x)              converts x (integer or string) into a float
+†    (symbol x)             converts x (string) into a symbol
+†    (string x)             converts x (any type at all) into a string
+    	    		   (as would be produced by print())
+
+
+∆    (concat x y)           concatenates x and y (lists, strings, symbols)
+                           (treat nil as the empty list)
+
+[abcdefg]
+ 1234567
+(1 2 3 4)
+(2 3)
+(slice [] 3 5) -> [cd]
+x    (slice x a b)          returns the part of x with indexes a <= index < b
+    	       		   negative indexes count from the end of the x
+			   (if b < a then the result is reversed)
+[abcdefg]
+ 1234567
+(slice [] 2 7 2) -> [cd]
+x    (slice x a b c)        returns the part of x with indexes a <= index < b
+    	       	 	   where index has a stride of c instead of 1
+			   (if b < a then the result is reversed)
+
+
+
+†    (length x)             returns the length of x (list, string, symbol)
+†    (nth x n)              returns the element of x (list, string, symbol) at index n
+asdf
+0123
+∆    (set-nth x n i)        sets the nth element of x (list, string or symbol) to i
+    	       	 	   (for strings and symbols, i must be an integer containing
+			   a character code)
+

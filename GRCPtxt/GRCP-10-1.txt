@@ -283,9 +283,14 @@ You now have a fully functional programming language in a couple hundred lines o
 
 
 
+quasiquote[`] -> 中身のlistを独自の方法で評価する
+			unquoteならevalする
+			それ以外はそのまま
+unquote[,] -> 中身をevalする
+			quasiquote[`]内で使われる
 
-
-
+unquote-splicing[,@] ->中身のリストをリストを外してreturnする
+				,@(list 1 2 3) -> 1 2 3
 
 (10)
 - Implement a special function "quasiquote" that behaves like "quote" with one
