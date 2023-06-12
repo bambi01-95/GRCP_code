@@ -1,0 +1,330 @@
+Graduation Research Project
+===========================
+
+16.0  Read does not expand syntax
+---------------------------------
+
+Syntax is expanded in read(), if necessary, after every list is read.  This is
+not convenient if we want to reuse read() to input data (not a program) from a
+file, for example.
+
+Remove the syntax expansion mechanism from read().
+
+Write a function 'oop expand(oop obj, oop env)' that expands syntax.  If obj is
+not a Cell then you can return it unmodified.  If obj is a Cell and its 'a'
+part is a Symbol that has an associated syntax function then return the result
+of applying that function to the (un-evaluated) list of arguments in obj and
+then re-expanding the result.  If obj is a Cell that does not name syntax then
+return a new Cell whose 'a' and 'd' parts are the result of calling expand
+recursively on them.
+
+
+
+Your read-eval-print loop will now have to become a read-expand-eval-print
+loop.
+
+16.1  User-space quasi-quotation mechanism
+------------------------------------------
+
+You can now write quasiquote as a user-level syntax mechanism, directly in the
+language.  To make this easier you should expand read() so that it understands
+more shorthand quotation characters:
+
+    'x     ->  (quote x)
+    `x     ->  (quasiquote x)
+    ,x     ->  (unquote x)
+    ,@x    ->  (unquote-splicing x)
+
+Before defining the syntax for quasiquote we will incrementally write the
+function qq-value that expands the single argument value given to quasiquote.
+
+Some helper functions that might be convenient include:
+[00]
+    (caar x)          returns the head of the head of the list x, or nil
+    (cadr x)          returns the head of the tail of the list x, or nil
+    (cdar x)          returns the tail of the head of the list x, or nil
+    (cadar x)         returns the head of the tail of the head of the list x, or nil
+    (list args...)    returns a new list made from the args
+    (concat a b)      returns a new list made from concatenating the lists a and b
+
+Our strategy will be to rewrite (quasiquote x) into a complete constructor
+expression (using 'list', 'concat', 'quote', etc.) that constructs the list
+implied by 'x' at execution time.
+
+Start trivially.  Make (qq-value x) return the list "(quote x)".
+[01]
+    (qq-value  42)  	 => (quote x) -> (quote 42)?
+    (qq-value '42)  	 => (quote x) -> (quote (quote 42)?
+    (qq-value '(1 2 3))  => (quote (1 2 3))
+
+Next, deal with x being a list beginning with "unquote", which should return
+the second element in the list without placing it inside a "protective" quote
+form.  (This causes it to be evaluated when the constructor expression is
+evaluated.)  Otherwise just return x quoted, as before.
+[02]
+(qq-value '42)                 => (quote 42)
+(qq-value '(1 2 3)))           => (quote (1 2 3))
+(qq-value '(unquote 42)))      => 42
+(qq-value '(unquote (1 2 3)))  => (1 2 3)
+
+Note that the second result is wrong.  If x is a list that is not unquoted then
+we need to construct a new list made from each element in x, quoted or (if
+unquoted) x as-is.  Do this with another function, qq-list.  Your qq-value,
+which is now complete, should now look like this:
+[03]
+    if x is not a list, return (quote x)
+    if x begins with 'unquote' then return x
+    return the result of applying qq-list to x
+
+Make a trivial version of (qq-list x) that returns an expression to construct a
+list containing the elements of x.  For example:
+[04]
+    (qq-list '(1 2))  => (cons (quote 1) (cons (quote 2) nil))
+
+Note that qq-value is applied to each element in x when constructing the
+result, so that:
+[05]
+    (qq-list '((+ 1 2) (+ 1 2)))   => (cons (cons (quote +) (cons (quote 1) (cons (quote 2) nil)))
+    	     	       	    	            (cons (cons (quote +) (cons (quote 1) (cons (quote 2) nil)))
+				                  nil))
+
+    (qq-list '((+ 1 2) ,(+ 1 2)))  => (cons (cons (quote +) (cons (quote 1) (cons (quote 2) nil)))
+    	     	       	     	      	    (cons (+ 1 2)
+					    	  nil))
+
+(Note the literal value 3 computed in the list that is constructed in the second example.)
+
+
+
+
+
+[06]
+The only remaining detail is to implement unquote-splicing, which behaves like
+unquote except that the result should be a list whose elements are inserted
+in-place into a larger list being constructed.  Since it only makes sense
+inside a list, we should recognise unquote-splicing in qq-list.  (It is
+actually impossible to write it as part of qq-value.)
+
+(qq-list x) should therefore test the first element in x, (car x), and if it is
+a list L whose first element, (caar x), is 'unquote-splicing' then it should
+return an expression to concatenate the result of the second element, (cadar
+x), in L with the result of qq-list on the tail of x, as before.  The qq-list
+function is now complete.
+
+    (qq-list '(1 (* 6 7) 666))   => (cons (quote 1)
+                                          (cons (cons (quote *) (cons (quote 6) (cons (quote 7) nil)))
+                                                (cons (quote 666)
+                                                      nil)))
+
+    (qq-list '(1 ,(* 6 7)) 666)  => (cons (quote 1)
+    	     	       	   	    	  (cons (* 6 7)
+					  	(cons (quote 666)
+						      nil)))
+
+    (qq-list '(1 ,@(6 7)) 666)   => (cons (quote 1)
+    	     	      	  	    	  (concat (list 6 7)
+					  	  (cons (quote 666)
+						  	nil)))
+
+You can now define the quasiquote syntax:
+
+    (define-syntax quasiquote
+      (lambda (quasiquote expression)
+        (qq-value expression)))
+
+
+
+
+
+
+16.2  User-define syntax: cond
+------------------------------
+
+Define syntax for 'cond'.  In general, the form looks like this:
+
+    (cond
+      (condition1 expression1)
+      (condition2 expression2)
+      ...
+      (conditionN expressionN))
+
+The trivial case '(cond)' should return nil.
+
+Other cases can be implemented using a divide-and-conquer strategy, where
+
+    (cond
+      (condition1 expression1)
+      ...etc...)
+
+expands into:
+
+    (if condition1 expression1
+        (cons
+	  ...etc...))
+
+
+
+
+
+16.3  User-define syntax: let
+-----------------------------
+
+Write syntax to transform
+
+    (let ((a 6)
+    	  (b 7))
+      (* a b))
+
+into:
+
+    ( (lambda (a b)
+        (* a b))
+      6
+      7 )
+
+(For this you will find the function (map fn list) useful which returns a list
+of the result of applying fn to each element in list.)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+16.2  Command-line options
+--------------------------
+
+Your read-eval-print loop currently prints out lots of things that perhaps are
+not useful.  Create a variable 'int opt_v = 0;' and make your printing be
+conditional:
+
+    if opt_v > 1 then print the result returned from read()
+    if opt_v > 2 then print the result returned from expand()
+    if opt_v > 0 then print the final result returned from eval()
+
+Before your read-eval-print loop, scan the command-line arguments in argv[].
+Respond to the option "-v" by increasing the value of opt_v by 1.  Respond to
+the option "+v" by decreasing the value of opt_v by 1.
+
+
+
+16.4  Reading programs from a file
+----------------------------------
+
+Modify read() so that it takes an input stream 'fp', from which input will be
+read, as a parameter:
+
+    oop read(FILE *fp)
+
+You will have to replace some functions, as follows:
+
+    getchar()         -> getc(fp)
+    ungetc(c, stdin)  -> ungetc(c, fp)
+
+Verify that your program still runs all your tests correctly.
+
+Move your read-eval-print loop out of main into a function called:
+
+    repl(FILE *fp)
+
+Call this from main() with
+
+    repl(stdin);
+
+which will read the program from the standard input.  Verify that your program
+still runs all the test cases.
+
+Next, modify your command-line argument scan so that if it does not recognise
+the argument as an option then it will try to open the argument as a file for
+reading, call repl() on the resulting stream, and then close the stream.
+
+At the end of the arguments, if you have already opened one or more explicit
+program files, then avoid running 'repl(stdin);'.
+
+To allow mixing stdin with named files, make the argument "-" run repl() on
+stdin.
+
+
+16.5  A standard start-up file
+------------------------------
+
+It is tedious to reproduce our useful functions (caar, cadr, list, map, etc.)
+in every source file.  We can automatically read a standard start-up file which
+contains these definitions.
+
+Modify main() so that when you are about to run repl() for the first time (on a
+file or on stdin) you first try to open a file called "boot.txt" and, if it
+exists, run repl() on its contents.
+
+Add another command-line option "-b" that suppresses the opening and running of
+"boot.txt".
+
+
+16.6  Using your language as a script interpreter
+-------------------------------------------------
+
+In repl() check whether the very first character in a file is a hash symbol
+'#'.  If it is then ignore the rest of the first line in the file (treat it as
+a comment).  This will allow you to use your program as an interpreter for
+script files.  If your program is called "./grcp" then you can write a script
+file "script.txt" like this
+
+    #!./grcp
+    (println 42)
+
+make it executable
+
+    chmod +x script.txt
+
+and then run it as a program
+
+    ./tmp.txt
+
+which should print 42.
+
+
+
+
+
+
+
+
+
+((lambda (x) ((while (< x 10) (if (= x 1) (println (quote one)) (if (= x 6) (println (quote six)) (if (quote t) (println (quote other)) nil))) (setq x (+ 1 x))))) 
+((lambda (x) (while (< x 10) (if (= x 1) (println (quote one)) (if (= x 6) (println (quote six)) (if (quote t) (println (quote other)) nil))) (setq x (+ 1 x)))) 0)
+
+func: (((while (< x 10) (if (= x 1) (println (quote one)) (if (= x 6) (println (quote six)) (if (quote t) (println (quote other)) nil))) (setq x (+ 1 x)))))
+env: ((x . 0))
+
+func: ((while (< x 10) (if (= x 1) (println (quote one)) (if (= x 6) (println (quote six)) (if (quote t) (println (quote other)) nil))) (setq x (+ 1 x))))
+env((x . 0))
+
+(define-syntax let
+  (lambda (let bindings . expressions)
+    `( (lambda ,(map car bindings) ,@expressions) <-- , -> ,@
+       ,@(map cadr bindings)
+     )))
+
+

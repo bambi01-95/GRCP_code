@@ -1,5 +1,5 @@
-// versinon w15
-// 2023.05.23
+// versinon w16
+// 2023.05.30
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -499,6 +499,14 @@ oop evlist(oop list,oop env){
 	}
 	return newCell(eval(list->Cell.a,env),evlist(list->Cell.d,env));
 }
+/*
+全てのa側をevalして、末端のdを最後にevalして返す。
+＊a側のaはevalしない。右の場合(a d)が評価されることになる。
+ list       list
+  /\         /\
+ a /\       /\
+  a        a  d
+*/
 
 /*////////////////////////////////////////////////////////
 
@@ -508,21 +516,6 @@ oop evlist(oop list,oop env){
 oop define(oop name, oop value);
 oop apply(oop func,oop args,oop env);
 
-oop prim_less(oop args,oop env)
-{
-    oop arg = car(args);
-    if(Object_type(arg)!=Integer){
-        fprintf(stderr,"Integer arg [prim_less]");
-        exit(1);
-    }
-    while(Object_type(cdr(args))==Cell){
-        args = cdr(args);
-        if(Integer_value(arg)>=Integer_value(car(args)))
-            return nil;
-        arg = car(args);
-    }
-    return t;
-}
 
 // (+ car(args) cadr(args))
 oop prim_plus(oop args,oop env)
@@ -692,7 +685,21 @@ oop prim_divid(oop args,oop env)
     return 0;
     return 0;
 }
-
+oop prim_less(oop args,oop env)
+{
+    oop arg = car(args);
+    if(Object_type(arg)!=Integer){
+        fprintf(stderr,"Integer arg [prim_less]");
+        exit(1);
+    }
+    while(Object_type(cdr(args))==Cell){
+        args = cdr(args);
+        if(Integer_value(arg)>=Integer_value(car(args)))
+            return nil;
+        arg = car(args);
+    }
+    return t;
+}
 oop prim_equal(oop args,oop env){
     oop a = car(args);
     oop b = cadr(args);
@@ -712,19 +719,12 @@ oop prim_equal(oop args,oop env){
     return nil;
 }
 
+
 oop prim_car(oop args,oop env){
     return car(car(args));
 }
 oop prim_cdr(oop args,oop env){
     return cdr(car(args));
-}
-oop prim_list_P(oop args,oop env){
-    if(Object_type(car(args))==Cell)
-        return t;
-    return nil;
-}
-oop prim_cons(oop args,oop env){
-    return newCell(car(args),cadr(args));
 }
 // 15.2
 oop prim_eval(oop args,oop env){
@@ -756,7 +756,9 @@ oop prim_issymbol(oop args,oop env){
     return nil;
 }
 
-
+oop prim_cons(oop args,oop env){
+    return newCell(car(args),cadr(args));
+}
 oop prim_integer(oop args,oop env){
     oop obj = car(args);
     switch(Object_type(obj)){
@@ -903,6 +905,7 @@ oop prim_slice(oop args,oop env){
     int step = 1;
     if(Object_type(c)==Integer)
         step = Integer_value(c);
+        
     int len = Integer_value(prim_length(args,env)) ;
     if(a<0)a = len + 1 +a;
     if(b<0)b = len + 1 +b;
@@ -1110,6 +1113,11 @@ oop spec_define_syntax(oop args,oop env)
     syntax = newCell(ass,syntax);
     return value;
 }
+//(lambda (x) (* x x))
+//(lambda args (....))
+oop spec_lambda(oop args,oop env){
+    return newClosure(car(args),cdr(args),env);
+}
 
 oop spec_if(oop args,oop env)
 {
@@ -1131,6 +1139,29 @@ oop spec_while(oop args,oop env)
     }
     return nil;
 }
+oop spec_and(oop args,oop env){
+    oop result = t;
+    while(Object_type(args)==Cell){
+        result = eval(args->Cell.a,env);
+        if(result==nil)return nil;
+        args = args->Cell.d;
+    }
+    printf("true\n");
+    return result;
+}
+oop spec_or(oop args,oop env){
+    oop result = nil;
+    while(Object_type(args)==Cell){
+        result = eval(args->Cell.a,env);
+        if(result!=nil)return result;
+        args = args->Cell.d;
+    }
+    return result;
+}
+oop spec_not(oop args,oop env){
+    return (eval(car(args),env)==nil)?t:nil;
+}
+
 
 oop spec_quote(oop args,oop env)
 {
@@ -1174,11 +1205,7 @@ oop spec_quasiquote(oop args,oop env){
     }
     return revlist(list,nil);
 }
-//(lambda (x) (* x x))
-//(lambda args (....))
-oop spec_lambda(oop args,oop env){
-    return newClosure(car(args),cdr(args),env);
-}
+
 
 oop spec_print(oop args,oop env){
     print(car(args));
@@ -1231,28 +1258,7 @@ oop spec_setq(oop args,oop env){
     return value;
 }
 
-oop spec_and(oop args,oop env){
-    oop result = t;
-    while(Object_type(args)==Cell){
-        result = eval(args->Cell.a,env);
-        if(result==nil)return nil;
-        args = args->Cell.d;
-    }
-    printf("true\n");
-    return result;
-}
-oop spec_or(oop args,oop env){
-    oop result = nil;
-    while(Object_type(args)==Cell){
-        result = eval(args->Cell.a,env);
-        if(result!=nil)return result;
-        args = args->Cell.d;
-    }
-    return result;
-}
-oop spec_not(oop args,oop env){
-    return (eval(car(args),env)==nil)?t:nil;
-}
+
 /*////////////////////////////////////////////////////////
 
     APPLY EVAL DEFINE
@@ -1368,37 +1374,37 @@ int extension(char* name){
 }
 int main(int argc,char **argv)
 {
-    nil        	= newObject(Undefined);
-	t          	= newSymbol("t");
-	globals     = nil;
-    syntax = nil;
+    nil     = newObject(Undefined);
+	t       = newSymbol("t");
+	globals = nil;
+    syntax  = nil;
 
-    sym_quote   = newSymbol("quote");
+    sym_quote      = newSymbol("quote");
     sym_quasiquote = newSymbol("quasiquote");
-    sym_unquote = newSymbol("unquote");
+    sym_unquote    = newSymbol("unquote");
     sym_unquote_splicing = newSymbol("unquote-splicing");
-    sym_lambda  = newSymbol("lambda");
+    sym_lambda     = newSymbol("lambda");
 
-
+//Prim_Func
     define(newSymbol("+"), newPrimitive(prim_plus));
     define(newSymbol("-"), newPrimitive(prim_minus));
     define(newSymbol("*"), newPrimitive(prim_multi));
     define(newSymbol("/"), newPrimitive(prim_divid));
     define(newSymbol("<"), newPrimitive(prim_less));
     define(newSymbol("="), newPrimitive(prim_equal));
+
     define(newSymbol("car"),newPrimitive(prim_car));
     define(newSymbol("cdr"),newPrimitive(prim_cdr));
-    define(newSymbol("list?"),newPrimitive(prim_list_P));
-    define(newSymbol("cons"),newPrimitive(prim_cons));
     define(newSymbol("eval"), newPrimitive(prim_eval));
     define(newSymbol("apply"), newPrimitive(prim_apply));
-// 15.5
+    // 15.5
     define(newSymbol("list?"),newPrimitive(prim_islist));
     define(newSymbol("integer?"),newPrimitive(prim_isinteger));
     define(newSymbol("float?"),newPrimitive(prim_isfloat));
     define(newSymbol("string?"),newPrimitive(prim_isstring));
     define(newSymbol("symbol?"),newPrimitive(prim_issymbol));
 
+    define(newSymbol("cons"),newPrimitive(prim_cons));
     define(newSymbol("integer"),newPrimitive(prim_integer));
     define(newSymbol("float"),newPrimitive(prim_float));
     define(newSymbol("symbol"),newPrimitive(prim_symbol));
@@ -1413,6 +1419,8 @@ int main(int argc,char **argv)
 // SPEC_FUNC
     define(newSymbol("define"),newSpecial(spec_define));
     define(newSymbol("define-syntax"),newSpecial(spec_define_syntax));
+    define(newSymbol("lambda"),newSpecial(spec_lambda));
+
     define(newSymbol("if"),    newSpecial(spec_if));
     define(newSymbol("while"), newSpecial(spec_while));
     define(newSymbol("and"), newSpecial(spec_and));
@@ -1422,8 +1430,6 @@ int main(int argc,char **argv)
     define(newSymbol("quote"), newSpecial(spec_quote));
     define(newSymbol("quasiquote"),newSpecial(spec_quasiquote));//w15
     define(newSymbol("unquote"),newSpecial(spec_unquote));
-
-    define(newSymbol("lambda"),newSpecial(spec_lambda));
 
     define(newSymbol("print"),  newSpecial(spec_print));
     define(newSymbol("println"),newSpecial(spec_println));

@@ -1,5 +1,5 @@
-// versinon w15
-// 2023.05.23
+// versinon w16
+// 2023.06.01 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -236,20 +236,7 @@ int isident(int c)
     return isalpha(c) || strchr("!#$%&*+-/:;<=>?\\^_|~", c);
 }
 
-int nextchar(void)
-{
-    int c = getchar();
-    while (isspace(c)||c==';'){
-        if(c==';'){
-            while(c!='\n'){
-                c = getchar();
-            }
-        }
-        else
-        c = getchar();
-    }
-    return c;
-}
+
 
 oop revlist(oop list, oop tail)
 {
@@ -269,42 +256,55 @@ oop cadr(oop obj);
 oop assoc(oop obj,oop alist);
 oop apply(oop,oop,oop);
 void println(oop);
+int nextchar(FILE *fp)
+{
+    int c = fgetc(fp);
+    while (isspace(c)||c==';'){
+        if(c==';'){
+            while(c!='\n'){
+                c = fgetc(fp);
+            }
+        }
+        c = fgetc(fp);
+    }
+    return c;
+}
 
-oop read(void) // read stdin and return an object, or 0 if EOF
+oop read(FILE *fp) // read stdin and return an object, or 0 if EOF
 {
     int c;
-    c = nextchar();
+    c = nextchar(fp);
     if (isdigit(c) || c=='.') { // å
         int length = 0;
         char buf[32];
         int isDot = 0;
         while(isdigit(c) && length<sizeof(buf)-1){
             buf[length++] = c;
-            c = getchar();
+            c = fgetc(fp);
         }
         // float
         if(c == '.'){
             buf[length++] = c;
-            c = getchar();
+            c = fgetc(fp);
             isDot = 1;
             while(isdigit(c) && length<sizeof(buf)-1){
                 buf[length++] = c;
-                c = getchar();
+                c = fgetc(fp);
             }
         }
         // exponential
         if( c == 'e'){
-            c = getchar();
+            c = fgetc(fp);
             int sign = 0;
             int exlen = 0;
             char expo[8];
             switch(c){
                 case '-':sign = 1;
-                case '+':c=getchar();
+                case '+':c=fgetc(fp);
                 case '0' ... '9':{
                     while(isdigit(c) && length<sizeof(expo)-1){
                         buf[exlen++] = c;
-                        c = getchar();
+                        c = fgetc(fp);
                     }
                     // how to deal with...
                     // 100e-4???
@@ -317,7 +317,7 @@ oop read(void) // read stdin and return an object, or 0 if EOF
             }
         }
         buf[length] = 0;
-        ungetc(c,stdin);
+        ungetc(c,fp);
         if(isDot>0 && length>1){
             return newFloat(atof(buf));
         }
@@ -332,9 +332,9 @@ oop read(void) // read stdin and return an object, or 0 if EOF
         int length = 0;
         do {
             string[length++] = c;
-            c = getchar();
+            c = fgetc(fp);
         } while((isident(c) || isdigit(c)) && length < sizeof(string) - 1);
-        ungetc(c, stdin);
+        ungetc(c, fp);
         string[length] = '\0';
         if (!strcmp(string, "nil")) return nil;
         return newSymbol(string);
@@ -343,7 +343,7 @@ oop read(void) // read stdin and return an object, or 0 if EOF
         char string[64];
         int length = 0;
         int c;
-        while(length < sizeof(string) - 1 && ((c=getchar())!='\"')){
+        while(length < sizeof(string) - 1 && ((c=fgetc(fp))!='\"')){
             string[length++] = c;
         }
         string[length] = '\0';
@@ -351,61 +351,62 @@ oop read(void) // read stdin and return an object, or 0 if EOF
     }
     
     if(c=='`'){
-        oop list = read();
+        oop list = read(fp);
         return newCell(sym_quasiquote,newCell(list,nil));
     }
     if(c==','){
-        c = nextchar();
+        c = nextchar(fp);
         if(c=='@'){
-            oop list = read();
+            oop list = read(fp);
             return newCell(sym_unquote_splicing,newCell(list,nil));
         }
-        ungetc(c,stdin);
-        oop list = read();
+        ungetc(c,fp);
+        oop list = read(fp);
         return newCell(sym_unquote,newCell(list,nil));
     }
 // 'a -> (quote a)
     if (c == '\''){
-        oop list = read();
+        oop list = read(fp);
         return newCell(sym_quote,newCell(list,nil));
     }
     if (c == '(') { // ( a b (a b))
         oop list = nil;
-        c = nextchar();
+        c = nextchar(fp);
         while (c != ')' && c != '.') {
-            ungetc(c, stdin);
-            oop obj = read();
+            ungetc(c, fp);
+            oop obj = read(fp);
             if (!obj) {
             fprintf(stderr, "EOF while reading list\n");
             exit(1);
             }
             list = newCell(obj, list); // push element onto front of list
-            c = nextchar();
+            c = nextchar(fp);
         }
         oop last = nil;
         if (c == '.') {
-            last = read();
+            last = read(fp);
             if (!last) {
             fprintf(stderr, "EOF while reading list\n");
             exit(1);
             }
-            c = nextchar();
+            c = nextchar(fp);
         }
         if (c != ')') {
             fprintf(stderr, "')' expected at end of list\n");
             exit(1);
         }
-
-        oop newlist = revlist(list,last);
-        oop head = car(newlist);
-        if(Object_type(head)==Symbol){
-            oop ass = assoc(head,syntax);
-            if(ass!=nil){
-                oop value = cdr(ass);
-                return apply(value,newlist,nil);
-            }
-        }
-        return newlist;
+        return revlist(list,last);
+        // <-
+        // oop newlist = revlist(list,last);
+        // oop head = car(newlist);
+        // if(Object_type(head)==Symbol){
+        //     oop ass = assoc(head,syntax);
+        //     if(ass!=nil){
+        //         oop value = cdr(ass);
+        //         return apply(value,newlist,nil);
+        //     }
+        // }
+        // return newlist;
     }
     if (c == EOF) return 0;
     fprintf(stderr, "illegal character: [%c] 0x%02x\n", c,c);
@@ -461,10 +462,8 @@ void print(oop obj)
 
 void println(oop obj)
 {
-    if(obj!=nil){
     print(obj);
     putchar('\n');
-    }
 }
 
 
@@ -502,6 +501,10 @@ oop evlist(oop list,oop env){
 	return newCell(eval(list->Cell.a,env),evlist(list->Cell.d,env));
 }
 
+
+
+
+
 /*////////////////////////////////////////////////////////
 
     PRIM FUNCION
@@ -510,21 +513,6 @@ oop evlist(oop list,oop env){
 oop define(oop name, oop value);
 oop apply(oop func,oop args,oop env);
 
-oop prim_less(oop args,oop env)
-{
-    oop arg = car(args);
-    if(Object_type(arg)!=Integer){
-        fprintf(stderr,"Integer arg [prim_less]");
-        exit(1);
-    }
-    while(Object_type(cdr(args))==Cell){
-        args = cdr(args);
-        if(Integer_value(arg)>=Integer_value(car(args)))
-            return nil;
-        arg = car(args);
-    }
-    return t;
-}
 
 // (+ car(args) cadr(args))
 oop prim_plus(oop args,oop env)
@@ -694,7 +682,21 @@ oop prim_divid(oop args,oop env)
     return 0;
     return 0;
 }
-
+oop prim_less(oop args,oop env)
+{
+    oop arg = car(args);
+    if(Object_type(arg)!=Integer){
+        fprintf(stderr,"Integer arg [prim_less]");
+        exit(1);
+    }
+    while(Object_type(cdr(args))==Cell){
+        args = cdr(args);
+        if(Integer_value(arg)>=Integer_value(car(args)))
+            return nil;
+        arg = car(args);
+    }
+    return t;
+}
 oop prim_equal(oop args,oop env){
     oop a = car(args);
     oop b = cadr(args);
@@ -714,19 +716,12 @@ oop prim_equal(oop args,oop env){
     return nil;
 }
 
+
 oop prim_car(oop args,oop env){
     return car(car(args));
 }
 oop prim_cdr(oop args,oop env){
     return cdr(car(args));
-}
-oop prim_list_P(oop args,oop env){
-    if(Object_type(car(args))==Cell)
-        return t;
-    return nil;
-}
-oop prim_cons(oop args,oop env){
-    return newCell(car(args),cadr(args));
 }
 // 15.2
 oop prim_eval(oop args,oop env){
@@ -758,7 +753,9 @@ oop prim_issymbol(oop args,oop env){
     return nil;
 }
 
-
+oop prim_cons(oop args,oop env){
+    return newCell(car(args),cadr(args));
+}
 oop prim_integer(oop args,oop env){
     oop obj = car(args);
     switch(Object_type(obj)){
@@ -932,14 +929,13 @@ oop prim_slice(oop args,oop env){
             return list;
         }
         case String:{
-            char* value = strdup(String_value(obj));
-            step = step-1;
-            int last_index = 0;
-            for(int i = a-1;i<b-a;i += step){
-                value[i] = value[a-1 + i];
-                last_index++;
+            char* name = String_value(obj);
+            char value[sizeof(name)];
+            int i = step-1;
+            for(int j = 0;i<b-a;i += step){
+                value[j++] = name[a+i];
             }
-            value[last_index+1] = 0;
+            value[i-step] = 0;
             len = strlen(value);
             if(rev==1){
                 for(int i=0;i<len/2;i++){
@@ -1113,6 +1109,11 @@ oop spec_define_syntax(oop args,oop env)
     syntax = newCell(ass,syntax);
     return value;
 }
+//(lambda (x) (* x x))
+//(lambda args (....))
+oop spec_lambda(oop args,oop env){
+    return newClosure(car(args),cdr(args),env);
+}
 
 oop spec_if(oop args,oop env)
 {
@@ -1123,99 +1124,86 @@ oop spec_if(oop args,oop env)
     }
 }
 
+// (while (< x 10) (seq x (+ 1))(setq (+ y 1)) (pritn x y))
 oop spec_while(oop args,oop env)
 {
-    while(eval(car(args),env)!=nil){
+    oop result = nil;
+    while(eval(car(args),env)!=nil){// list -> s
         oop arg = cdr(args);
         while(arg!=nil){
-            eval(car(arg),env);
+            result = eval(car(arg),env);
             arg = cdr(arg);
         }
     }
-    return nil;
+    return result;
 }
+
+oop spec_and(oop args,oop env){
+    oop result = t;
+    while(Object_type(args)==Cell){
+        result = eval(args->Cell.a,env);
+        if(result==nil)return nil;
+        args = args->Cell.d;
+    }
+    return result;
+}
+oop spec_or(oop args,oop env){
+    oop result = nil;
+    while(Object_type(args)==Cell){
+        result = eval(args->Cell.a,env);
+        if(result!=nil)return result;
+        args = args->Cell.d;
+    }
+    return result;
+}
+oop spec_not(oop args,oop env){
+    return (eval(car(args),env)==nil)?t:nil;
+}
+
 
 oop spec_quote(oop args,oop env)
 {
     return car(args);
 }
-oop spec_unquote(oop args,oop env){
-    return eval(cadr(args),env);
-}
 
-    // (quasiquote (1 (+ 2 3) (unquote (+ 4 5)) (+ 6 7)))
-    // => (1 (+ 2 3) 9 (+ 6 7))
-oop spec_quasiquote(oop args,oop env){
-    if(Object_type(car(args))!=Cell)
-        return car(args);
-
-    oop list = nil;
-    args = car(args);
-    while(args!=nil){
-        oop arg = car(args);//1, (+ 2 3), (unquote ...)
-
-        if(Object_type(arg)==Cell){
-            
-            if(car(arg)==sym_unquote){
-                printf("unquote:");
-                arg = eval(cadr(arg),env);
-            }
-
-            if(car(arg)==sym_unquote_splicing){
-                printf("spq:");
-                oop alist = cadr(arg);
-                alist = cdr(alist);
-                while(cdr(alist)!=nil){
-                    list = newCell(car(alist),list);
-                    alist = cdr(alist);
-                }
-                arg = car(alist);
-            }
-        }
-        list = newCell(arg,list);
-        args = cdr(args);
-    }
-    return revlist(list,nil);
-}
-//(lambda (x) (* x x))
-//(lambda args (....))
-oop spec_lambda(oop args,oop env){
-    return newClosure(car(args),cdr(args),env);
-}
 
 oop spec_print(oop args,oop env){
-    print(car(args));
+    oop value = nil;
+    value = eval(car(args),env);
+    print(value);
     while(args!=nil){
-        print(eval(car(args),env));
+        value = eval(car(args),env);
+        print(value);
         putchar(' ');
         args = cdr(args);
     }
-    return nil;
+    return value;
 }
 
 oop spec_println(oop args,oop env){
-    while(args!=nil){
+    oop result = nil;
+    while(Object_type(args)==Cell){
         println(eval(car(args),env));
         args = cdr(args);
     }
-    return nil;
+    return eval(car(args),env);
 }
 
-// too long?
-oop spec_let(oop args,oop env){
-    //  (let ((n1 v1) (n2 v2) ...) e1 e2 ...)
-    oop a_args = car(args); //((n1 v1) (n2 v2) ...) nx:para vx:valu
-    oop values  = nil;
-    oop parames = nil;
-    while(a_args!=nil){
-        oop paravalu = car(a_args);
-        values = newCell(eval(cadr(paravalu),env),values);
-        parames= newCell(car(paravalu),parames);
-        a_args = cdr(a_args);
-    }
-    /*-using apply(), because inside spec function. but closure is not spec func...*/
-    return apply(newClosure(parames,cdr(args),env),revlist(values,nil),env);
-}
+// // too long?
+// oop spec_let(oop args,oop env){
+//     //  (let ((n1 v1) (n2 v2) ...) e1 e2 ...)
+//     oop a_args = car(args); //((n1 v1) (n2 v2) ...) nx:para vx:valu
+//     oop values  = nil;
+//     oop parames = nil;
+//     while(a_args!=nil){
+//         oop paravalu = car(a_args);
+//         values = newCell(eval(cadr(paravalu),env),values);
+//         parames= newCell(car(paravalu),parames);
+//         a_args = cdr(a_args);
+//     }
+//     /*-using apply(), because inside spec function. but closure is not spec func...*/
+//     return apply(newClosure(parames,cdr(args),env),revlist(values,nil),env);
+// }
 
 // add grcp14
 oop spec_setq(oop args,oop env){
@@ -1248,19 +1236,26 @@ oop apply(oop func,oop args,oop env){
         case Special:
             return func->Special.function(args,env);
         case Closure:{
+            printf("this is a pen\n");
             oop newenv  = pairlist(Closure_parameters(func),args,Closure_environment(func));
             oop newfunc = func->Closure.expression;
-            // printf("env: ");println(newenv);
-            while(cdr(newfunc)!=nil){
-                eval(car(newfunc),newenv);
+            oop result = nil;
+            while(Object_type(newfunc)==Cell){
+    			printf("func: ");println(newfunc);
+                printf("env: ");println(newenv);
+                result = eval(car(newfunc),newenv);
+                printf("is");
                 newfunc = cdr(newfunc);
             }
-            return eval(car(newfunc),newenv);
+            printf("this:");
+            println(result);
+            return result;
         }
         default:
         break;
     }
-
+    printf("func: ");println(func);
+    printf("args");println(args);
 	fprintf(stderr,"ERROR:end apply()\n");
 	exit(1);
 	return 0;
@@ -1282,8 +1277,9 @@ oop eval(oop exp,oop env){
 			if(list==nil){
                 oop value = exp->Symbol.value;
                 if(value==nil){
+                    putchar('\n');
                     println(exp);
-                    fprintf(stderr,"is not defined value:[in eval symbol]\n");
+                    fprintf(stderr," is not defined value:[in eval symbol]\n");
                     exit(1);
                 }
                 return value;
@@ -1327,46 +1323,90 @@ oop define(oop name, oop value){
     name->Symbol.value = value;
     return value;
 }
-
+// ( ( ) ( ) ( ))
+oop expand(oop obj,oop env){
+    if(Object_type(obj)==Cell){
+        oop head = car(obj);
+        oop tail = cdr(obj);
+        if(Object_type(head)==Symbol){
+            oop ass = assoc(head,syntax);
+            if(ass!=nil){
+                oop function = cdr(ass);
+                return expand(apply(function,obj,env),env);
+            }
+        }
+        return newCell(expand(head,env),expand(tail,env));
+    }
+    return obj;
+}
 /*////////////////////////////////////////////////////////
 
     MAIN
     
 ////////////////////////////////////////////////////////*/
+oop repl(FILE *fp,int opt_v){
+    oop obj = nil;
+    opt_v = 3;
+    int c = getc(fp);
+    if(c == '#'){
+        while(c != '\n'){
+            c = getchar();
+        }
+    }
+    else ungetc(c,fp);
+    for (;;) { // read-print loop
+        obj = read(fp);
+        if(!obj)break;
+        if(opt_v>1){
+            println(obj);// (println 100) / (cond ())
+        }
+        obj = expand(obj,syntax);
+        if(opt_v>2){
+            printf(">");
+            println(obj);// (println 100) / (if ----)
+        }
+        obj = eval(obj,nil);
+        if(opt_v>0){
+            printf(">>");
+            println(obj);// 100? / ;;;;
+        }
+    }
+    return obj;
+}
 
-int main()
+int main(int argc,char **argv)
 {
-    nil        	= newObject(Undefined);
-	t          	= newSymbol("t");
-	globals     = nil;
-    syntax = nil;
+    nil     = newObject(Undefined);
+	t       = newSymbol("t");
+	globals = nil;
+    syntax  = nil;
 
-    sym_quote   = newSymbol("quote");
+    sym_quote      = newSymbol("quote");
     sym_quasiquote = newSymbol("quasiquote");
-    sym_unquote = newSymbol("unquote");
+    sym_unquote    = newSymbol("unquote");
     sym_unquote_splicing = newSymbol("unquote-splicing");
-    sym_lambda  = newSymbol("lambda");
+    sym_lambda     = newSymbol("lambda");
 
-
+//Prim_Func
     define(newSymbol("+"), newPrimitive(prim_plus));
     define(newSymbol("-"), newPrimitive(prim_minus));
     define(newSymbol("*"), newPrimitive(prim_multi));
     define(newSymbol("/"), newPrimitive(prim_divid));
     define(newSymbol("<"), newPrimitive(prim_less));
     define(newSymbol("="), newPrimitive(prim_equal));
+
     define(newSymbol("car"),newPrimitive(prim_car));
     define(newSymbol("cdr"),newPrimitive(prim_cdr));
-    define(newSymbol("list?"),newPrimitive(prim_list_P));
-    define(newSymbol("cons"),newPrimitive(prim_cons));
     define(newSymbol("eval"), newPrimitive(prim_eval));
     define(newSymbol("apply"), newPrimitive(prim_apply));
-// 15.5
+    // 15.5
     define(newSymbol("list?"),newPrimitive(prim_islist));
     define(newSymbol("integer?"),newPrimitive(prim_isinteger));
     define(newSymbol("float?"),newPrimitive(prim_isfloat));
     define(newSymbol("string?"),newPrimitive(prim_isstring));
     define(newSymbol("symbol?"),newPrimitive(prim_issymbol));
 
+    define(newSymbol("cons"),newPrimitive(prim_cons));
     define(newSymbol("integer"),newPrimitive(prim_integer));
     define(newSymbol("float"),newPrimitive(prim_float));
     define(newSymbol("symbol"),newPrimitive(prim_symbol));
@@ -1381,28 +1421,54 @@ int main()
 // SPEC_FUNC
     define(newSymbol("define"),newSpecial(spec_define));
     define(newSymbol("define-syntax"),newSpecial(spec_define_syntax));
+    define(newSymbol("lambda"),newSpecial(spec_lambda));
+
     define(newSymbol("if"),    newSpecial(spec_if));
     define(newSymbol("while"), newSpecial(spec_while));
+    define(newSymbol("and"), newSpecial(spec_and));
+    define(newSymbol("or"),newSpecial(spec_or));
+    define(newSymbol("not"),newSpecial(spec_not));
 
     define(newSymbol("quote"), newSpecial(spec_quote));
-    define(newSymbol("quasiquote"),newSpecial(spec_quasiquote));//w15
-    define(newSymbol("unquote"),newSpecial(spec_unquote));
-
-    define(newSymbol("lambda"),newSpecial(spec_lambda));
 
     define(newSymbol("print"),  newSpecial(spec_print));
     define(newSymbol("println"),newSpecial(spec_println));
-    define(newSymbol("let"),    newSpecial(spec_let));
     define(newSymbol("setq"),   newSpecial(spec_setq));
-
-    for (;;) { // read-print loop
-        oop obj = read();
-        if (!obj) break;
-        println(eval(obj,globals));
+    int opt_v = 0;
+    int opt_s = 0;
+    char *name;
+    FILE *fp = NULL;
+    // char *file;
+    // char *file[32];
+    for(int i=1; i<argc ;i++){
+        if(strcmp(argv[i],"-v")==0)opt_v++;
+        else if(strcmp(argv[i],"-")==0)opt_s++;
+        else if(strcmp(argv[i],"+v")==0)opt_v--;
+        else if(strcmp(argv[i],"-b")==0){
+            fp = fopen("boot.txt","r");
+            if(fp==NULL){
+                fprintf(stderr,"OPEN ERROR: %s\n","boot.txt");
+            }
+            else
+                repl(fp,opt_v);
+        }
+        else{
+            fp = fopen(argv[i],"r");
+            if(fp==NULL){
+                fprintf(stderr,"OPEN ERROR: %s\n",argv[i]);
+                //exit(1);
+            }
+            else{
+                repl(fp,opt_v);
+                break;
+            }
+        }
     }
+
+    if(fp==NULL || opt_s > 0){
+        fp = stdin;
+        repl(fp,opt_v);
+    }
+    
     return 0;
 }
-
-//expand(): apply syntax after read / before eval()
-//includ file: that make our lang. as nor normal lang.
-//quaote etc..: that is ... very complex...

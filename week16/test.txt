@@ -1,1 +1,117 @@
-a
+;;[00]
+(define caar (lambda (x) (car (car x))))
+(define cadr (lambda (x) (car (cdr x))))
+(define cadar (lambda (x) (car (cdr (car x)))))
+(define list (lambda args args))
+
+;; ;;[01-02]
+;; (define qq-value (lambda (x)
+;;     (if (= (car x) 'unquote)
+;;         (cadr x)
+;;         (list 'quote x))
+;; ))
+
+;;     ;; (qq-list '(1 2))
+;;     ;; (qq-value  42)  	 ;=> (quote x) -> (quote 42)?
+;;     ;; (qq-value '42)  	 ;=> (quote x) -> (quote (quote 42)?
+;;     ;; (qq-value '(1 2 3))  ;=> (quote (1 2 3))
+
+;;     (qq-value '42)                ; => (quote 42)
+;;     (qq-value '(1 2 3))           ; => (quote (1 2 3))
+;;     (qq-value '(unquote 42))      ; => 42
+;;     (qq-value '(unquote (1 2 3))) ; => (1 2 3)
+;;     stop
+;; [03]
+;; (define qq-value (lambda (x) 
+;;         (println x)
+;;         (if (list? x)
+;;             (if (= (car x) 'unquote) 
+;;                 (cadr x) 
+;;                 (qq-list x))
+;;             (if (= x 'nil) 'nil (list 'quote x))
+;;         )
+;;     )
+;; )
+    ;; (qq-value '42)                ; => (quote 42)
+    ;; (qq-value '(1 2 3))           ; => (quote (1 2 3)) -> qq-list is not defined
+    ;; (qq-value '(unquote 42))      ; => 42
+    ;; (qq-value '(unquote (1 2 3))) ; => (1 2 3)
+    ;; stop
+
+;; ;; [04]
+;; (define qq-list  (lambda (x)
+;;         (if (list? x)
+;;             (list 'cons (qq-value (car x)) (qq-list (cdr x))) 
+;;             )
+;;     )
+;; )
+    ;;[04]
+    ;; ;;(qq-list '(1 2))
+;;[05]
+;; (define qq-list  (lambda (x)
+;;         (if (list? x)
+;;                 (list 'cons (qq-value  (car x)) (qq-value (cdr x)))
+;;             'nil
+;;         )
+;;     )
+;; )
+;; (println '---------)
+;;     ;;[05]
+;;     (qq-list '((+ 1 2) (+ 1 2)))
+;;     (qq-list '((+ 1 2) ,(+ 1 2)))
+;; [06]
+;; (define qq-list  (lambda (x)
+;;         (if (list? x)
+;;             (if (= (caar x) 'unquote-splicing)
+;;                 (list 'concat (cadar x) (qq-value (cdr x)))
+;;                 (list 'cons (qq-value  (car x)) (qq-value (cdr x)))
+;;             ) 
+;;             'nil
+;;         )
+;;     )
+;; )
+    ;; [06]
+    ;; (qq-list '(1 (* 6 7) 666))
+    ;; (qq-list '(1 ,(* 6 7) 666));; )
+    ;; (qq-list '(1 ,@(6 7) 666));; )
+    ;; (qq-list '(1 ,@(2 3 4) 5))
+
+(define qq-value (lambda (x) 
+        (if (list? x)
+            (if (= (car x) 'unquote) 
+                (cadr x) 
+                (qq-list x))
+            (if (= x 'nil) 'nil (list 'quote x))
+        )
+    )
+)
+
+(define qq-list  (lambda (x)
+        (if (list? x)
+            (if (= (caar x) 'unquote-splicing)
+                (list 'concat (cadar x) (qq-value (cdr x)))
+                (list 'cons (qq-value  (car x)) (qq-value (cdr x)))
+            ) 
+            'nil
+        )
+    )
+)
+
+(define-syntax quasiquote 
+    (lambda (quasiquote expression)
+        (println expression)
+        (qq-value expression)))
+
+
+(qq-list '(1 ,@(list 2 3 4) 5))
+;;(cons (quote 1) (concat (list 2 3 4) (cons (quote 5) nil)))
+;; (define a `(1 ,@(2 3 4) 5))
+;; (define map (lambda (fn x)
+;;             (list fn x)))
+;; (define a (list 1 2 3))
+;; (map car a)
+stop
+
+(qq-list (quote (1 (unquote-splicing (2 3 4)) 5)))
+->(cons (quote 1) (concat (2 3 4) (cons (quote 5) nil)))
+-->(1 2 3 4 5)

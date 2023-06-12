@@ -1,5 +1,6 @@
 // versinon w15
-// 2023.05.23
+// 2023.05.26
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -736,8 +737,8 @@ oop prim_apply(oop args,oop env){
     return apply(car(args),cadr(args),env);
 }
 
-// 15.5
-oop prim_islist(oop args,oop env){
+// 15.5 check each type
+oop prim_islist(oop args,oop env){ 
     if(Object_type(car(args))==Cell)return t;
     return nil;
 }
@@ -758,7 +759,7 @@ oop prim_issymbol(oop args,oop env){
     return nil;
 }
 
-
+//15.5 convert type function
 oop prim_integer(oop args,oop env){
     oop obj = car(args);
     switch(Object_type(obj)){
@@ -808,7 +809,7 @@ oop prim_float(oop args,oop env){
     return 0;
 }
 
-oop prim_symbol(oop args,oop env){    //asdf これあってるか？
+oop prim_symbol(oop args,oop env){   
     oop obj = car(args);
     if(Object_type(obj)==String){
         char *name = String_value(obj);
@@ -866,10 +867,13 @@ oop prim_string(oop args,oop env){
     return 0;
 }
 
+
+// normal function in .grl
 oop concat(oop list,oop tail){
     if(Object_type(list)==Cell)return newCell(car(list),concat(cdr(list),tail));
     return tail;
 }
+// mallocとかでstrcat使わずに書く †
 oop prim_concat(oop args,oop env){
     oop a = car(args);
     oop b = cadr(args);
@@ -878,6 +882,7 @@ oop prim_concat(oop args,oop env){
             return b;
         case String:{//oK?
             if(b==nil)return a;
+            // char *name = malloc(sizeof(char *) * (len(a->String.value)+len(b->String.value)+1))
             return newString(strcat(String_value(a),String_value(b)));
         }
         case Symbol:{//oK?
@@ -896,7 +901,7 @@ oop prim_concat(oop args,oop env){
     return 0;
 }
 //
-oop prim_length(oop,oop);
+oop prim_length(oop,oop);//†
 oop prim_slice(oop args,oop env){
     oop obj = car(args);
     int a = Integer_value(cadr(args));
@@ -932,14 +937,13 @@ oop prim_slice(oop args,oop env){
             return list;
         }
         case String:{
-            char* value = strdup(String_value(obj));
-            step = step-1;
-            int last_index = 0;
-            for(int i = a-1;i<b-a;i += step){
-                value[i] = value[a-1 + i];
-                last_index++;
+            char* name = String_value(obj);
+            char value[sizeof(name)];
+            int i = step-1;
+            for(int j = 0;i<b-a;i += step){
+                value[j++] = name[a+i];
             }
-            value[last_index+1] = 0;
+            value[i-step] = 0;
             len = strlen(value);
             if(rev==1){
                 for(int i=0;i<len/2;i++){
@@ -975,6 +979,7 @@ oop prim_slice(oop args,oop env){
     return nil;
 }
 
+//ok
 oop prim_length(oop args,oop env){
     oop obj = car(args);
     switch(Object_type(obj)){
@@ -995,7 +1000,7 @@ oop prim_length(oop args,oop env){
             exit(1);
     }
 }
-
+//ok? †
 oop prim_nth(oop args,oop env){//(nth x n)
     oop obj = car(args);
     int n = Integer_value(cadr(args));
@@ -1023,7 +1028,7 @@ oop prim_nth(oop args,oop env){//(nth x n)
     exit(1);
     return nil;
 }
-
+//chek the original obj, maybe it will be change!! †
 oop prim_set_nth(oop args,oop env){
     oop obj = car(args);
     int n = Integer_value(cadr(args));
@@ -1328,6 +1333,12 @@ oop define(oop name, oop value){
     return value;
 }
 
+oop expand(oop obj,oop env){
+    if(Object_type(obj)==Cell){
+        return apply(car(obj),cdr(obj),env);
+    }
+    return newCell(sym_quote,obj);
+}
 /*////////////////////////////////////////////////////////
 
     MAIN
@@ -1402,7 +1413,3 @@ int main()
     }
     return 0;
 }
-
-//expand(): apply syntax after read / before eval()
-//includ file: that make our lang. as nor normal lang.
-//quaote etc..: that is ... very complex...

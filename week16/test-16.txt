@@ -1,0 +1,71 @@
+(define caar (lambda (x) (car (car x))))
+(define cadr (lambda (x) (car (cdr x))))
+(define cdar (lambda (x) (cdr (car x))))
+(define cadar (lambda (x) (car (cdr (car x)))))
+
+
+(define list (lambda args args))
+
+(define qq-list
+  (lambda (values)
+    (if (list? values)
+        (if (= 'unquote-splicing (caar values))
+	    (list 'concat (cadar values) (qq-list (cdr values)))
+	    (list 'cons   (qq-value (car values))
+	      	          (qq-list (cdr values)))))));;qq-value->list
+
+(define qq-value
+  (lambda (expression)
+    (if (list? expression)
+        (if (= 'unquote (car expression))
+	    (cadr expression)
+	    (qq-list expression))
+	(list 'quote expression))))
+
+;; (qq-value '42)
+;; (qq-value '(unquote 42))
+;; (qq-value '(,@(list 2 3)))
+
+;; stop
+(define-syntax quasiquote
+  (lambda (quasiquote expression)
+    (qq-value expression)
+    ))
+
+;;    (let ((a 6) (b 7)) (* a b))
+;; => ( (lambda (a b) (* a b)) 6 7 )
+
+(define map
+  (lambda (fn list)
+    (if (list? list)
+        (cons (fn (car list)) (map fn (cdr list))))))
+
+(define-syntax let
+  (lambda (let bindings . expressions)
+    `( (lambda ,(map car bindings) ,@expressions)
+       ,@(map cadr bindings)
+     )))
+
+;; (++ var) increments a variable
+
+(define-syntax ++
+  (lambda (++ var)
+    `(setq ,var (+ 1 ,var))))
+
+
+(define-syntax cond
+  (lambda (cond . clauses)
+    (if (list? clauses)
+    	`(if ,(caar  clauses)
+	     ,(cadar clauses)
+	     (cond ,@(cdr clauses))))))
+
+
+;; test all of the above in one big example
+(let ((x 0))
+  (while (< x 10)
+    (cond
+      ( (= x 1) (println 'one)  )
+      ( (= x 6) (println 'six)  )
+      ('t       (println 'other)))
+    (++ x)))

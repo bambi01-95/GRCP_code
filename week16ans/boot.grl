@@ -1,0 +1,74 @@
+;;; boot.grl -- standard definitions for the Graduation Research Language
+;;;
+;;; Last edited: 2023-06-06 16:07:05 by piumarta on zora-14.local
+
+;; car and cdr are primitive
+
+(define caar (lambda (x) (car (car x))))
+(define cadr (lambda (x) (car (cdr x))))
+(define cdar (lambda (x) (cdr (car x))))
+(define cadar (lambda (x) (car (cdr (car x)))))
+
+;; print and putc are primitive
+
+(define println (lambda args (apply print args) (putc 10)))
+
+(define list (lambda args args))
+
+;; concat and list? are primitive
+
+(define qq-list
+  (lambda (values)
+    (if (list? values)
+        (if (= 'unquote-splicing (caar values))
+	    (list 'concat (cadar values) (qq-list (cdr values)))
+	    (list 'cons   (qq-value (car values))
+	      	          (qq-list (cdr values)))))))
+
+(define qq-value
+  (lambda (expression)
+    (if (list? expression)
+        (if (= 'unquote (car expression))
+	    (cadr expression)
+	    (qq-list expression))
+	(list 'quote expression))))
+
+(define-syntax quasiquote
+  (lambda (quasiquote expression)
+    (qq-value expression)))
+
+;;    (let ((a 6) (b 7)) (* a b))
+;; => ( (lambda (a b) (* a b)) 6 7 )
+
+(define map
+  (lambda (fn list)
+    (if (list? list)
+        (cons (fn (car list)) (map fn (cdr list))))))
+
+(define-syntax let
+  (lambda (let bindings . expressions)
+    `( (lambda ,(map car bindings) ,@expressions)
+       ,@(map cadr bindings)
+     )))
+
+;; (++ var) increments a variable
+
+(define-syntax ++
+  (lambda (++ var)
+    `(setq ,var (+ 1 ,var))))
+
+(define-syntax cond
+  (lambda (cond . clauses)
+    (if (list? clauses)
+    	`(if ,(caar  clauses)
+	     ,(cadar clauses)
+	     (cond ,@(cdr clauses))))))
+
+    ;; (let ((x 1))
+    ;;     (+ x x)
+    ;;     (+ 2 x))
+        
+    ;; (cond
+    ;;   ( (= x 1) (println 'one)  )
+    ;;   ( (= x 6) (println 'six)  )
+    ;;   ('t       (println 'other)))

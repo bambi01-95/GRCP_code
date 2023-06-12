@@ -1,0 +1,11 @@
+#!./grcp-16
+
+;; standard definitions are now read from boot.grl
+
+(let ((x 0))
+  (while (< x 10)
+    (cond
+      ( (= x 1) (println 'one)  )
+      ( (= x 6) (println 'six)  )
+      ('t       (println 'other)))
+    (++ x)))

@@ -1,0 +1,72 @@
+(func exp)
+
+    [ quote ]
+'42 == (quote 42)
+< expression >
+    (quote 42)			42
+    (quote (1 (2) 3))		(1 (2) 3)
+    ''hello  			(quote hello)
+
+if func == quote
+    return exp
+
+    [ quasiquote && unquote ]
+`foo   ==  (quasiquote foo)
+,foo   ==  (unquote foo) 
+< expression >
+    (quasiquote (1 (+ 2 3) (unquote (+ 4 5)) (+ 6 7)))
+        => (1 (+ 2 3) 9 (+ 6 7)) 
+    (1 (+ 2 3) ,(+ 4 5) (+ 6 7))	
+        => (1 (+ 2 3) 9 (+ 6 7))
+    (list 2 3 4)				
+        => (2 3 4)
+    `(1 (unquote (list 2 3 4)) 5)		
+        => (1 (2 3 4) 5)
+
+    [unquote-splicing]
+,@(list 1 2) == (unquote-splicig (list 1 2))
+
+< expression >
+`(1 (unquote-splicing (list 2 3 4)) 5)	
+    => (1 2 3 4 5)
+`(1 ,@(list 2 3 4) 5)			
+    => (1 2 3 4 5)
+----------------------------------
+atomic value is not cell
+    'func               'func
+    '(1 2 3)            (1 2 3)
+    `(1 2 3)            (1 2 3)
+    `((+ 1 2) ,(+ 1 2)) ((+ 1 2) 3)
+    `(1 2 ,@(+ 1 2))    (1 2 3)
+
+    prim -> 全てが評価される
+    (list 'car x) -> (car x)
+
+primitive (+ 1 2) 
+special   (if 1 2)
+sytax_def (cond ((f) 1) ((f) 1))
+
+expand(){
+    if(cell)
+        xxx
+    return 
+}
+
+ーーーーーーーーーーーーーー
+(slice a b c d)
+a -> list,symbol or string
+b -> start index
+c -> end index
+d -> steps 
+
+a     = (0 1 2 3 4 5 6 7 8 9)
+index =  1 2 3 4 5 6 7 8 9 10
+-ind  = 10 9 8 7 6 5 4 3 2 1
+
+(slice a 1 10) 
+    -> (0 1 2 3 4 5 6 7 8 9)
+
+(slice a 10 1)
+    -> (9 8 7 6 5 4 3 2 1 0)
+
+(slice a )
