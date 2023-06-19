@@ -352,8 +352,6 @@ oop apply(oop func, oop args, oop env)
 	case Primitive:	return func->Primitive.function(args, env);
 	case Special:	return func->Special.function(args, env);
 	case Closure: {
-		// println(func);
-		// println(args);
 	    oop params = func->Closure.parameters;
 	    oop body   = func->Closure.expressions;
 	    oop cenv   = func->Closure.environment;
@@ -661,11 +659,11 @@ oop spec_while(oop args, oop env) // (while test expressions...)
     oop result = nil;
     args = cdr(args);
     while (nil != eval(test, env)) {
-	oop exprs = args;
-	while (Cell == Object_type(exprs)) {
-	    result = eval(exprs->Cell.a, env);
-	    exprs = exprs->Cell.d;
-	}
+	    oop exprs = args;
+        while (Cell == Object_type(exprs)) {
+            result = eval(exprs->Cell.a, env);
+            exprs = exprs->Cell.d;
+        }
     }
     return result;
 }
@@ -717,8 +715,11 @@ void push(jmp_buf *buf){
     return;
 }
 
-
 jmp_buf *pop(void){
+    if(buffCount<1){
+        printf(stderr,"ERROR: pop\n");
+        exit(1);
+    }
     jmp_buf * buf = buffArray->buf;
     buffArray = buffArray->next;
     buffCount--;
@@ -750,13 +751,8 @@ oop spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
 		bindings = bindings->Cell.d;
     }
     oop result = nil;
-    // while (Object_type(exprs) == Cell) {
-    //     result = eval(exprs->Cell.a, env2);
-    //     exprs = exprs->Cell.d;
-    // }
     jmp_buf buf;
     push(&buf);
-    printf("push the buff\n");
     if(setjmp(buf)){
         result = returnValue;
     }else{
@@ -764,8 +760,8 @@ oop spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
             result = eval(exprs->Cell.a, env2);
             exprs = exprs->Cell.d;
         }
+        pop();
     }
-
     return result;
 }
 

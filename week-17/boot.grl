@@ -11,7 +11,7 @@
 
 ;; print and putc are primitive
 
-(define println (lambda args (apply print args) (putc 10)))
+;; (define println (lambda (args) (apply print args) (putc 10)))
 
 (define list (lambda args args))
 
@@ -33,6 +33,7 @@
 	    (qq-list expression))
 	(list 'quote expression))))
 
+
 (define-syntax quasiquote
   (lambda (quasiquote expression)
     (qq-value expression)))
@@ -45,11 +46,11 @@
     (if (list? list)
         (cons (fn (car list)) (map fn (cdr list))))))
 
-(define-syntax let
-  (lambda (let bindings . expressions)
-    `( (lambda ,(map car bindings) ,@expressions)
-       ,@(map cadr bindings)
-     )))
+;; (define-syntax let
+;;   (lambda (let bindings . expressions)
+;;     `( (lambda ,(map car bindings) ,@expressions)
+;;        ,@(map cadr bindings)
+;;      )))
 
 ;; (++ var) increments a variable
 

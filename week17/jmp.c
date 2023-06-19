@@ -4,23 +4,27 @@
 #include <setjmp.h>
 #include <stdio.h>
 jmp_buf buf;
+
 void func()
 {
     printf("Welcome to GeeksforGeeks\n");
   
     // Jump to the point setup by setjmp
     longjmp(buf, 1);
-  
-    printf("Geek2\n");
+    printf("doesn't reach\n");
 }
   
 int main()
 {
     // Setup jump position using buf and return 0
-    if (setjmp(buf))
-        printf("Geek3\n");
+    if (setjmp(buf)==2)
+        printf("Geek2==1\n");
+    else if(setjmp(buf)==1){
+        printf("Geek2==2\n");
+    }
     else {
-        printf("Geek4\n");
+        printf("%d--\n",setjmp(buf));
+        printf("Geek1\n");
         func();
     }
     return 0;

@@ -918,7 +918,7 @@ oop prim_slice(oop args,oop env){
             for(int i=0;i<a;i++){
                 obj = cdr(obj);
             }
-            printf("step %d\n",step);
+            // printf("step %d\n",step);
             for(int i=0;i<b-2;i++){
                 if((i+1)%step==0){
                     list = newCell(car(obj),list);
@@ -1171,6 +1171,7 @@ oop spec_print(oop args,oop env){
     oop value = nil;
     value = eval(car(args),env);
     print(value);
+
     while(args!=nil){
         value = eval(car(args),env);
         print(value);
@@ -1236,19 +1237,18 @@ oop apply(oop func,oop args,oop env){
         case Special:
             return func->Special.function(args,env);
         case Closure:{
-            printf("this is a pen\n");
+            // printf("this is a pen\n");
             oop newenv  = pairlist(Closure_parameters(func),args,Closure_environment(func));
             oop newfunc = func->Closure.expression;
             oop result = nil;
             while(Object_type(newfunc)==Cell){
-    			printf("func: ");println(newfunc);
-                printf("env: ");println(newenv);
+    			// printf("func: ");println(newfunc);
+                // printf("env: ");println(newenv);
                 result = eval(car(newfunc),newenv);
-                printf("is");
                 newfunc = cdr(newfunc);
             }
-            printf("this:");
-            println(result);
+            // printf("this:");
+            // println(result);
             return result;
         }
         default:

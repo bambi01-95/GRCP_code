@@ -1,0 +1,228 @@
+Graduation Research Project
+===========================
+
+17  Non-local control flow
+--------------------------
+
+Local control flow is that which passes to a sub-expression (and then back with
+a result) in a top-down fashion.  This is very easy to implement by having
+eval() and apply() make recursive calls to eval().  Local control flow also
+includes sequential evaluation through a sequence of expressions (as in the
+body of a lambda function or while loop).  This is also easy to implement
+because the entire sequence is evaluated within a single call to apply().
+
+Non-local control flow is any that deviates from these two trivial patterns.
+Examples include a 'return' statement inside a function which must cause an
+immediate return from the apply() that is currently executing the body of a
+lambda function.  The 'return' could be buried deep within 'while' loops, 'if'
+conditionals, etc., each of them introducing an extra level of 'eval()' between
+the 'return' statement and the 'apply()' that must immediately return a value
+to its caller.
+
+A similar situation occurs with 'break' and 'continue' inside a 'while' loop,
+each of which could be buried inside several intervening levels of 'eval()' and
+'apply()'.
+
+17.1  Implementing 'return'
+---------------------------
+
+Consider this situation:
+
+    (define f
+      (lambda (x)
+        (while (> x 0)
+	  (println x)
+	  (if (= x 10)
+	      (return 666))
+	  (setq x (- x 1)))
+	42))
+
+    (println (f  3))  =>  3  2  1  42  ; implicit return from f
+    (println (f 12))  => 12 11 10 666  ; explicit, early return from f
+
+The call '(f 3)' works in your current interpreter.  The second one '(f 12)'
+does not, because 'return' is not defined.
+
+Assuming we can define 'return' appropriately, when it is evaluated we have the
+following situation of recursive eval()s, shown from the bottom (most recent
+call) up, with indentation indicating a recursive call:
+
+  depth  evaluation in progress
+  -----  ----------------------
+    7.               apply( return '(666) ) <--- this initiates the return of 666
+    6.             eval( '(return 666) )
+    5.           eval( '(if ...) )
+    4.         eval( '(while ...) )
+    3.       apply( f '(12) )               <--- 666 has to be returned from here
+    2.     eval( '(f 12) )
+    1.   eval( '(println (f 12)) )
+
+The apply running at recursion depth 7 has to somehow cause the loop executing
+the body of the function f, at recursion depth 3, to return 666 normally to its
+caller -- with no more evaluation of any expressions being allowed to occur
+between them.
+
+More generally, when the innermost apply() returns 666 to its eval, that eval
+must immediately return 666 to the 'if' eval, which must immediately return 666
+to the 'while' eval, which must immediately return 666 to the 'f' apply, which
+must immediately return 666 to the '(f 12)' eval, which can then continue
+normally with the result it just received.
+
+One way to do this is to return two values from eval() and apply().  The first
+value is the actual result, in this case 666, and the other value tells the
+caller what to do with the result.  The common case will be to proceed normally,
+exactly as eval() and apply() do now.  The uncommon case will be to tell the caller
+that it should stop its normal process and immediately return the result to its caller.
+
+The return from value eval and apply will therefore be a tuple, { value, intent },
+where 'value' is the value returned and 'intent' can be one of 'RESULT' or 'RETURN'
+indicating if the value should be used as the normal result of eval/apply or if it
+should be returned immediately to the caller.
+
+In the example above, the apply at depth 7 returns { 666, RETURN }.  This
+causes the eval at depth 6 to immediately return { 666, RETURN } to its caller,
+which immediately returns the result to its caller, and so on, until the result
+reaches the apply at depth 3.  That apply sees the result intent is 'RETURN'
+rather than 'RESULT' and so immediately stops evaluating the expressions of the
+function body and instead returns { 666, RESULT } as the result of applying the
+function f.  The eval at depth 2 receives a normal RESULT (not a RETURN) value
+and so proceeds normally, unaware (and not caring) whether the 666 was returned
+normally from the function (by evaluating the last expression) or early (by
+evaluating a 'return' expression).
+
+  depth  evaluation in progress              tuple returned
+  -----  ----------------------              --------------
+    7.               apply( return '(666) )  { 666, RETURN }
+    6.             eval( '(return 666) )     { 666, RETURN }
+    5.           eval( '(if ...) )           { 666, RETURN }
+    4.         eval( '(while ...) )          { 666, RETURN }
+    3.       apply( f '(12) )                { 666, RESULT }
+    2.     eval( '(f 12) )                   { 666, RESULT }
+    1.   eval( '(println (f 12)) )           { 666, RESULT }
+
+In C, to return more than one result from a function, put them both into a
+single struct.  Let's call this struct 'struct Result' and typedef 'Result' to
+refer to it.  Let's say it has two members, 'oop value' and 'return_t intent',
+in that order.  The enum return_t contains two members, RET_RESULT and
+RET_RETURN.
+
+The eval() and apply() functions can now be modified to return a
+'Result' instead of 'oop'.  Of course this has implications elsewhere, and the
+following functions will all have to return a Result:
+
+    eval(oop exp, oop env);
+    apply(oop func, oop args, oop env)
+    evlist(oop list, oop env)
+    prim_*(oop args, oop env)
+    spec_*(oop args, oop env)
+    expand(oop obj, oop env)
+
+The 'return' expression can be implemented as a primitive, prim_return(), and
+then we can modify all the 'return' statements in the above functions as
+follows:
+
+    return (struct Result){ value, RET_RETURN }; // result returned from prim_return
+
+    return (struct Result){ value, RET_RESULT }; // normal return of result everywhere else
+
+Of course, every place these functions are called will also have to be modified
+to receive a Result value.  All but two of them can look something like this
+(using a call to eval() as a representative example):
+
+    Result _result = eval(expr, env);
+    if (_result.intent != RET_RESULT) return _result;  // non-local return
+    oop result = _result.value;
+
+Using the gcc compiler this can be made very convenient using an expression
+statement inside a pre-processor macro:
+
+    #define EVAL(EXP, ENV) ({                                \
+        Result _result = eval(EXP, ENV);                     \
+	if (_result.intent != RET_RESULT) return _result;    \
+	_result.value;                                       \
+    })
+
+Most calls to eval() can now be changed trivially from
+
+   oop result = eval(expr, env);
+
+to:
+
+   oop result = EVAL(expr, env);
+
+The two places that cannot use this macro are the call to eval() in apply()
+that evaluates the body of a lambda function, and the calls to expand() and
+eval() in the read-eval-print loop.
+
+In apply(), if the result from eval() is a RET_RETURN then the value should be
+immediately returned to the caller as a RET_RESULT.
+
+In the read-eval-print loop, which is evaluating an expression that cannot be
+inside the body of a function, if the result from eval() is a RET_RETURN then
+an error message should be printed complaining about a "return outside
+function".
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+17.2  Implementing 'break' and 'continue'
+-----------------------------------------
+
+The 'break' and 'continue' expressions can both be implemented as primitives,
+similar to prim_return, but returning a Result with intent set to RET_BREAK or
+RET_CONTINUE, respectively.  A normal call to EVAL() can still immediately
+return any Result whose intent is not RET_RESULT.
+
+In the spec_while() function, the Result from evaluating an expression in the
+body of the loop must be inspected.  If the intent is RET_RETURN, return it
+immediately, as before.  If the intent is RET_BREAK, return a normal RET_RESULT
+with value nil.  If the intent is RET_CONTINUE then jump back to the test at
+the start of the while loop.
+
+In the read-eval-print loop, a Result with intent RET_BREAK or RET_CONTINUE can
+cause an appropriate error message to be printed complaining about a "break
+outside loop" or "continue outside loop".
+
+Test your non-local control flow with this program:
+
+    (define f
+      (lambda (x)
+        (while (> x 0)
+              (println x)
+              (if (= x 10)
+                  (return 666))
+              (setq x (- x 1)))
+            42))
+
+    (println (f  3))  ;=>  3  2  1  42  ; implicit return from f
+    (println (f 12))  ;=> 12 11 10 666  ; explicit, early return from f
+
+    (define test (lambda ()
+      (let ((x 0))
+        (while (< (++ x) 10)
+          (println x)
+          (if (= x 5) (continue))
+          (println x)
+          (if (= x 8) (break))
+          (println x)))))
+
+    (println (test))
+    ; => 1 1 1
+    ;    2 2 2
+    ;    3 3 3
+    ;    4 4 4
+    ;    5
+    ;    6 6 6
+    ;    7 7 7
+    ;    8 8
+    ;    nil

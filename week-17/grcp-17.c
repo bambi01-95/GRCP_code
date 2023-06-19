@@ -19,17 +19,21 @@
 #include <assert.h>
 #include <setjmp.h>
 
-
-
 union Object;
 
 typedef union Object Object;
 typedef Object *oop;
 
 typedef enum { ILLEGAL, Undefined, Integer, Float, String, Symbol, Primitive, Special, Cell, Closure } type_t;
+typedef enum { RET_RESULT, RET_RETURN, RET_BREAK, RET_CONTINUE,}return_t;
 
-typedef oop (*prim_t)(oop args, oop env);
 
+struct Result{
+	oop value;
+	return_t intent;
+};
+typedef struct Result Result;
+typedef Result (*prim_t)(oop args, oop env);
 struct Integer 	 { type_t type;  int    value; };
 struct Float 	 { type_t type;  float  value; };
 struct String  	 { type_t type;  char  *value; };
@@ -275,13 +279,13 @@ void print(oop obj)
 	case Closure: {
 	    printf("<Closure ");
 	    if (nil != Closure_name(obj)) {
-		print(Closure_name(obj));
-		printf(" ");
+			print(Closure_name(obj));
+			printf(" ");
 	    }
 	    if (nil == obj->Closure.parameters)
-		printf("()");
+			printf("()");
 	    else
-		print(obj->Closure.parameters);
+			print(obj->Closure.parameters);
 	    printf(">");
 	    return;
 	}
@@ -303,6 +307,34 @@ oop cdar(oop obj)	{ return cdr(car(obj)); }
 oop cddr(oop obj)	{ return cdr(cdr(obj)); }
 oop caddr(oop obj)	{ return car(cdr(cdr(obj))); }
 
+
+#define RETURN(value) ({return (struct Result){ value, RET_RESULT };})
+
+#define EVAL(EXP, ENV) ({                                \
+    Result _result = eval(EXP, ENV);                     \
+	if (_result.intent != RET_RESULT) return _result;    \
+	_result.value;                                       \
+    })
+
+#define APPLY(OBJ, ARGS,ENV) ({                          \
+    Result _result = apply(OBJ,ARGS, ENV);               \
+	if (_result.intent != RET_RESULT) return _result;    \
+	_result.value;                                       \
+    })
+
+#define EVLIST(EXP, ENV) ({                              \
+    Result _result = evlist(EXP, ENV);                   \
+	if (_result.intent != RET_RESULT) return _result;    \
+	_result.value;                                       \
+    })
+
+#define EXPAND(EXP, ENV) ({                              \
+    Result _result = expand(EXP, ENV);                   \
+	if (_result.intent != RET_RESULT) return _result;    \
+	_result.value;                                       \
+    })
+
+	
 oop assoc(oop key, oop alist)
 {
     while (Object_type(alist) == Cell) {
@@ -313,12 +345,12 @@ oop assoc(oop key, oop alist)
     return nil;
 }
 
-oop eval(oop exp, oop env);
+Result eval(oop exp, oop env);
 
-oop evlist(oop list, oop env)
+Result evlist(oop list, oop env)
 {
     if (Object_type(list) != Cell) return eval(list, env);
-    return newCell(eval(list->Cell.a, env), evlist(list->Cell.d, env));
+    RETURN(newCell(EVAL(list->Cell.a, env), EVLIST(list->Cell.d, env)));
 }
 
 oop pairlist(oop keys, oop values, oop tail)
@@ -344,7 +376,7 @@ oop define(oop name, oop value)
     return name->Symbol.value = value;
 }
 
-oop apply(oop func, oop args, oop env)
+Result apply(oop func, oop args, oop env)
 {
     switch (Object_type(func)) {
 	case Primitive:	return func->Primitive.function(args, env);
@@ -358,10 +390,19 @@ oop apply(oop func, oop args, oop env)
 	    oop value  = nil;
 	    env = pairlist(params, args, cenv);
 	    while (Object_type(body) == Cell) {
-			value = eval(body->Cell.a, env);
+			//value = EVAL(body->Cell.a, env);
+			Result _result = eval(body->Cell.a, env);
+			switch(_result.intent){
+				case RET_RETURN:{
+					_result.intent = RET_RESULT;
+					return _result;
+				}
+				default:
+					value = _result.value;
+			}
 			body = body->Cell.d;
 	    }
-	    return value;
+	    RETURN(value);
 	}
 	default:
 	    break;
@@ -369,14 +410,14 @@ oop apply(oop func, oop args, oop env)
     printf("cannot apply: ");
     println(func);
     exit(1);
-    return 0;
+    RETURN(nil);
 }
 
-oop prim_add(oop args, oop env)
+Result prim_add(oop args, oop env)
 {
     int isum = 0;
     for (;;) {
-		if (Object_type(args) != Cell) return newInteger(isum);
+		if (Object_type(args) != Cell) RETURN(newInteger(isum));
 		oop arg = args->Cell.a;
 		if (Object_type(arg) != Integer) break;
 		isum += Integer_value(arg);
@@ -384,7 +425,7 @@ oop prim_add(oop args, oop env)
     }
     float fsum = isum;
     for (;;) {
-		if (Object_type(args) != Cell) return newFloat(fsum);
+		if (Object_type(args) != Cell) RETURN(newFloat(fsum));
 		oop arg = args->Cell.a;
 		if      (Object_type(arg) == Integer) fsum += Integer_value(arg);
 		else if (Object_type(arg) == Float)   fsum += Float_value(arg);
@@ -393,25 +434,23 @@ oop prim_add(oop args, oop env)
     }
     fprintf(stderr, "non-numeric argument in +\n");
     exit(1);
-    return 0;
+    RETURN(nil);
 }
-
-oop prim_subtract(oop args, oop env)
-{
+Result prim_subtract(oop args,oop env){
     if (Object_type(args) != Cell) {
 		printf("not enough arguments to -\n");
 		exit(1);
     }
     int diff = Integer_value(args->Cell.a);
-    if (Object_type(args = args->Cell.d) != Cell) return newInteger(-diff);
+    if (Object_type(args = args->Cell.d) != Cell) RETURN(newInteger(-diff));
     do {
 		oop arg = args->Cell.a;
 		diff = diff - Integer_value(arg);
     } while (Object_type(args = args->Cell.d) == Cell);
-    return newInteger(diff);
+    RETURN(newInteger(diff));
 }
 
-oop prim_multiply(oop args, oop env)
+Result prim_multiply(oop args, oop env)
 {
     int product = 1;
     while (Object_type(args) == Cell) {
@@ -419,10 +458,10 @@ oop prim_multiply(oop args, oop env)
 	product = product * Integer_value(arg);
 	args = args->Cell.d;
     }
-    return newInteger(product);
+    RETURN(newInteger(product));
 }
 
-oop prim_less(oop args, oop env)
+Result prim_less(oop args, oop env)
 {
     if (Object_type(args) != Cell || Object_type(args->Cell.d) != Cell) {
 	printf("not enough arguments to <\n");
@@ -434,7 +473,22 @@ oop prim_less(oop args, oop env)
 	printf("non-integer argument to <\n");
 	exit(1);
     }
-    return lhs->Integer.value < rhs->Integer.value ? sym_t : nil;
+    RETURN(lhs->Integer.value < rhs->Integer.value ? sym_t : nil);
+}
+
+Result prim_greater(oop args, oop env)
+{
+    if (Object_type(args) != Cell || Object_type(args->Cell.d) != Cell) {
+	printf("not enough arguments to <\n");
+	exit(1);
+    }
+    oop lhs = args->Cell.a;
+    oop rhs = args->Cell.d->Cell.a;
+    if (Object_type(lhs) != Integer || Object_type(rhs) != Integer) {
+	printf("non-integer argument to <\n");
+	exit(1);
+    }
+    RETURN(lhs->Integer.value > rhs->Integer.value ? sym_t : nil);
 }
 
 int equal(oop a, oop b)
@@ -452,19 +506,19 @@ int equal(oop a, oop b)
     return 0;
 }
 
-oop prim_equal(oop args, oop env)
+Result prim_equal(oop args, oop env)
 {
     oop value = car(args);
     args = cdr(args);
     while (Object_type(args) == Cell) {
 	oop arg = car(args);
-	if (!equal(value, arg)) return nil;
+	if (!equal(value, arg)) RETURN(nil);
 	args = cdr(args);
     }
-    return sym_t;
+    RETURN(sym_t);
 }
 
-oop prim_print(oop args, oop env)
+Result prim_print(oop args, oop env)
 {
     oop value = nil;
     while (Object_type(args) == Cell) {
@@ -473,74 +527,73 @@ oop prim_print(oop args, oop env)
 	args = args->Cell.d;
 	if (nil != args) printf(" ");
     }
-    return value;
+    RETURN(value);
 }
 
-oop prim_putc(oop args, oop env)
+Result prim_putc(oop args, oop env)
 {
     oop value = nil;
     while (Object_type(args) == Cell) {
 	oop value = args->Cell.a;
-	putchar(Integer_value(value));
-	args = args->Cell.d;
+		putchar(Integer_value(value));
+		args = args->Cell.d;
     }
-    return value;
+    RETURN(value);
 }
 
-oop prim_cons(oop args, oop env)
+Result prim_cons(oop args, oop env)
 {
-    return newCell(car(args), cadr(args));
+    RETURN(newCell(car(args), cadr(args)));
 }
 
-oop prim_car(oop args, oop env)
+Result prim_car(oop args, oop env)
 {
-    return caar(args);
+    RETURN(caar(args));
 }
 
-oop prim_cdr(oop args, oop env)
+Result prim_cdr(oop args, oop env)
 {
-    return cdar(args);
+    RETURN(cdar(args));
 }
-
-oop prim_listP(oop args, oop env)
+Result prim_listP(oop args, oop env)
 {
-    return Object_type(car(args)) == Cell ? sym_t : nil;
+    RETURN(Object_type(car(args)) == Cell ? sym_t : nil);
 }
 
 oop read(FILE *fp);
 
-oop prim_read(oop args, oop env)
+Result prim_read(oop args, oop env)
 {
-    return read(stdin);
+    RETURN(read(stdin));
 }
 
-oop prim_eval(oop args, oop env)
+Result prim_eval(oop args, oop env)
 {
     return eval(car(args), env);
 }
 
-oop prim_apply(oop args, oop env)
+Result prim_apply(oop args, oop env)
 {
     return apply(car(args), cadr(args), env);
 }
 
-oop prim_length(oop args, oop env)
+Result prim_length(oop args, oop env)
 {
     oop arg = car(args);
     switch (Object_type(arg)) {
-	case Undefined: return newInteger(0);
-	case String:	return newInteger(strlen(arg->String.value));
-	case Symbol:	return newInteger(strlen(arg->Symbol.name));
+	case Undefined: RETURN( newInteger(0));
+	case String:	RETURN( newInteger(strlen(arg->String.value)));
+	case Symbol:	RETURN( newInteger(strlen(arg->Symbol.name)));
 	case Cell: {
 	    int len = 0;
 	    while (Object_type(arg) == Cell) ++len, arg = arg->Cell.d;
-	    return newInteger(len);
+	    RETURN( newInteger(len));
 	}
 	default:
 	    fprintf(stderr, "non-lengthy thing in length\n");
 	    exit(1);
     }
-    return 0;
+    RETURN(nil);
 }
 
 oop concat(oop a, oop b)
@@ -550,12 +603,12 @@ oop concat(oop a, oop b)
 	: b;
 }
 
-oop prim_concat(oop args, oop env)
+Result prim_concat(oop args, oop env)
 {
     oop a = car(args);
     oop b = cadr(args);
     switch (Object_type(a)) {
-	case Undefined: return b;
+	case Undefined: RETURN(b);
 	case String: {
 	    if (Object_type(b) != String) {
 		fprintf(stderr, "cannot concat string and non-string\n");
@@ -567,7 +620,7 @@ oop prim_concat(oop args, oop env)
 	    memcpy(buf+la, b->String.value, lb);
 	    buf[la+lb] = 0;
 	    oop s = newString(buf);
-	    return s;
+	    RETURN(s);
 	}
 	case Symbol: {
 	    if (Object_type(b) != Symbol) {
@@ -581,22 +634,34 @@ oop prim_concat(oop args, oop env)
 	    buf[la+lb] = 0;
 	    oop s = newSymbol(buf);
 	    free(buf);
-	    return s;
+	    RETURN(s);
 	}
-	case Cell:	return concat(a, b);
+	case Cell:	RETURN(concat(a, b));
 	default:
 	    fprintf(stderr, "non-lengthy thing in length\n");
 	    exit(1);
     }
-    return 0;
+    RETURN(nil);
 }
 
-oop spec_lambda(oop args, oop env)
+Result prim_return(oop args,oop env){
+	return (struct Result){ car(args), RET_RETURN};
+}
+
+Result prim_break(oop args,oop env){
+	return (struct Result){ nil, RET_BREAK};
+}
+
+Result prim_continue(oop args,oop env){
+	return (struct Result){ nil, RET_CONTINUE};
+}
+
+Result spec_lambda(oop args, oop env)
 {
-    return newClosure(car(args), cdr(args), env);
+    RETURN(newClosure(car(args), cdr(args), env));
 }
 
-oop spec_define(oop args, oop env)
+Result spec_define(oop args, oop env)
 {
     oop name  = car(args);
     oop value = car(cdr(args));
@@ -604,31 +669,28 @@ oop spec_define(oop args, oop env)
 	fprintf(stderr, "define: name is not a symbol\n");
 	exit(1);
     }
-    value = eval(value, env);
-    return define(name, value);
+    value = EVAL(value, env);
+    RETURN(define(name, value));
 }
 
-oop spec_define_syntax(oop args, oop env)
+Result spec_define_syntax(oop args, oop env)
 {
     oop name  = car(args);
     oop value = car(cdr(args));
     if (Object_type(name) != Symbol) {
-	fprintf(stderr, "define-syntax: name is not a symbol\n");
-	exit(1);
+		fprintf(stderr, "define-syntax: name is not a symbol\n");
+		exit(1);
     }
-	printf("before:");
-	println(value);
-	printf("env:");
-	println(env);
-    value = eval(value, env);
+	value = EVAL(value,env);
     if (Object_type(value) != Closure) {
-	fprintf(stderr, "define-syntax: value is not a closure\n");
-	exit(1);
+		println(value);
+		fprintf(stderr, "define-syntax: value is not a closure\n");
+		exit(1);
     }
-    return name->Symbol.syntax = value;
+    RETURN(name->Symbol.syntax = value);
 }
 
-oop spec_setq(oop args, oop env)
+Result spec_setq(oop args, oop env)
 {
     oop name  = car(args);
     oop value = car(cdr(args));
@@ -636,70 +698,88 @@ oop spec_setq(oop args, oop env)
 	fprintf(stderr, "setq: name is not a symbol\n");
 	exit(1);
     }
-    value = eval(value, env);
+    value = EVAL(value, env);
     oop ass = assoc(name, env);
     if (Object_type(ass) == Cell)
 	ass->Cell.d = value;
     else
 	name->Symbol.value = value;
-    return value;
+    RETURN(value);
 }
 
-oop spec_quote(oop args, oop env)
+Result spec_quote(oop args, oop env)
 {
-    return car(args);
+    RETURN(car(args));
 }
 
-oop spec_if(oop args, oop env)
+Result spec_if(oop args, oop env)
 {
-    return eval(car  (args), env) == nil
+    return EVAL(car  (args), env) == nil
 	?  eval(caddr(args), env)
 	:  eval(cadr (args), env);
 }
 
-oop spec_while(oop args, oop env) // (while test expressions...)
+Result spec_while(oop args, oop env) // (while test expressions...)
 {
     oop test   = car(args);
     oop result = nil;
     args = cdr(args);
-    while (nil != eval(test, env)) {
-	oop exprs = args;
-	while (Cell == Object_type(exprs)) {
-	    result = eval(exprs->Cell.a, env);
-	    exprs = exprs->Cell.d;
-	}
+Label:
+    while (nil != EVAL(test, env)) {
+		oop exprs = args;
+		while (Cell == Object_type(exprs)) {
+			Result _result = eval(exprs->Cell.a, env);
+			switch(_result.intent){
+				case RET_BREAK:{
+					_result.intent = RET_RESULT;
+					return _result;
+				}
+				case RET_CONTINUE:{
+					_result.intent = RET_RESULT;
+					goto Label;
+				}
+				case RET_RETURN:{
+					return _result;//if not work
+				}
+					
+				default:{
+					result = _result.value;
+				}
+			}
+			exprs = exprs->Cell.d;
+		}
     }
-    return result;
+    RETURN(result);
 }
 
-oop spec_and(oop args, oop env) // (and exp exp exp ...)
+Result spec_and(oop args, oop env) // (and exp exp exp ...)
 {
     oop result = sym_t;
     while (Object_type(args) == Cell) {
-	result = eval(args->Cell.a, env); // head of the list
-	if (nil == result) return nil;
+	result = EVAL(args->Cell.a, env); // head of the list
+	if (nil == result) RETURN(nil);
 	args = args->Cell.d;         // tail of the list
     }
-    return result;
+    RETURN(result);
 }
 
-oop spec_or(oop args, oop env) // (or exp exp exp ...)
+Result spec_or(oop args, oop env) // (or exp exp exp ...)
 {
     oop result = nil;
     while (Object_type(args) == Cell) {
-	result = eval(args->Cell.a, env); // head of the list
-	if (nil != result) return result;
+	result = EVAL(args->Cell.a, env); // head of the list
+	if (nil != result) RETURN(result);
 	args = args->Cell.d;         // tail of the list
     }
-    return result;
+    RETURN(result);
 }
 
-oop spec_not(oop args, oop env) // (or exp exp exp ...)
+Result spec_not(oop args, oop env) // (or exp exp exp ...)
 {
-    return car(args) == nil ? sym_t : nil;
+    RETURN(car(args) == nil ? sym_t : nil);
 }
 
-oop spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
+Result spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
 {
     oop env2 = env;
     oop bindings = car(args);
@@ -708,32 +788,32 @@ oop spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
 		oop bind  = bindings->Cell.a;
 		oop name  = car(bind);
 		oop value = cadr(bind);
-		env2 = newCell(newCell(name, eval(value, env)), env2); // NOTE: evaluate args in ORIGINAL environment
+		env2 = newCell(newCell(name, EVAL(value, env)), env2); // NOTE: evaluate args in ORIGINAL environment
 		bindings = bindings->Cell.d;
     }
     oop result = nil;
     while (Object_type(exprs) == Cell) {
-		result = eval(exprs->Cell.a, env2);
+		result = EVAL(exprs->Cell.a, env2);
 		exprs = exprs->Cell.d;
     }
-    return result;
+    RETURN(result);
 }
 
-oop eval(oop exp, oop env)
+
+Result eval(oop exp, oop env)
 {
     switch (Object_type(exp)) {
-	case Undefined:	return exp;
-	case Integer:	return exp;
-	case Float:	return exp;
-	case String:    return exp;
+	case Undefined:	
+	case Integer:	
+	case Float:	
+	case String:    RETURN(exp);
 	case Symbol: {
 	    oop ass = assoc(exp, env);
 	    if (ass != nil) {
-		assert(Object_type(ass) == Cell);
-		return ass->Cell.d;
+			assert(Object_type(ass) == Cell);
+			RETURN(ass->Cell.d);
 	    }
-	    if (exp->Symbol.value)
-		return exp->Symbol.value;
+	    if (exp->Symbol.value)RETURN(exp->Symbol.value);
 	    fprintf(stderr, "undefined variable: %s\n", exp->Symbol.name);
 	    exit(1);
 	    break;
@@ -741,14 +821,14 @@ oop eval(oop exp, oop env)
 	case Cell: { // (function ...arguments...)
 	    oop func = exp->Cell.a;
 	    oop args = exp->Cell.d;
-	    func = eval(func, env);
-	    if (Object_type(func) != Special) args = evlist(args, env);
+	    func = EVAL(func, env);
+	    if (Object_type(func) != Special) args = EVLIST(args, env);
 	    return apply(func, args, env);
 	}
 	default:	break;
     }
     assert(0);
-    return 0;
+    RETURN(nil);
 }
 
 int isident(int c)
@@ -890,15 +970,15 @@ oop read(FILE *fp) // read stdin and return an object, or 0 if EOF
     return 0;
 }
 
-oop expand(oop obj, oop env)
+Result expand(oop obj, oop env)
 {
-    if (Object_type(obj) != Cell) return obj; // cannot be a macro
+    if (Object_type(obj) != Cell) RETURN(obj); // cannot be a macro
     oop head = obj->Cell.a;
     if (Object_type(head) == Symbol && head->Symbol.syntax)
 	// make sure it is not quote HERE !
-	return expand(apply(head->Symbol.syntax, obj, env), env);  // is a (macro ...)
+	return expand(APPLY(head->Symbol.syntax, obj, env), env);  // is a (macro ...)
     oop tail = obj->Cell.d;
-    return newCell(expand(head, env), expand(tail, env)); // expand head and tail recursively
+    RETURN(newCell(EXPAND(head, env), EXPAND(tail, env))); // expand head and tail recursively
 }
 
 
@@ -914,8 +994,33 @@ void replFile(FILE *fp)
     for (;;) { // read-print loop
 	oop obj = read(fp);
 	if (!obj) break; /* EOF */	if (opt_v > 1) { println(obj); }
-	obj = expand(obj, nil);		if (opt_v > 2) { printf("  -> ");  println(obj); }
-	obj = eval(obj, nil);		if (opt_v > 0) { if (opt_v > 1) printf("  => ");  println(obj); }
+		Result _result1 = expand(obj,nil);
+		obj = _result1.value;
+		if (opt_v > 2) { printf("  -> ");  println(obj); }
+		Result _result2 = eval(obj,nil);
+		switch(_result2.intent){
+			case RET_RESULT:break;
+			case RET_RETURN:{
+				fprintf(stderr,"return outside function\n");
+				exit(1);
+			}
+			case RET_BREAK:
+			{
+				fprintf(stderr,"break outside loop\n");
+				exit(1);
+			}
+			case RET_CONTINUE:
+			{
+				fprintf(stderr,"continue outside loop\n");
+				exit(1);
+			}
+			default:{
+				fprintf(stderr,"not defined case in replFile\n");
+				exit(1);
+			}
+		}
+		obj = _result2.value;
+		if (opt_v > 0) { if (opt_v > 1) printf("  => ");  println(obj); }
     }
 }
 
@@ -948,18 +1053,22 @@ int main(int argc, char **argv)
     define(newSymbol("-"),     	newPrimitive(prim_subtract));
     define(newSymbol("*"),     	newPrimitive(prim_multiply));
     define(newSymbol("<"),     	newPrimitive(prim_less    ));
+	define(newSymbol(">"),      newPrimitive(prim_greater ));
     define(newSymbol("="),     	newPrimitive(prim_equal   ));
     define(newSymbol("print"), 	newPrimitive(prim_print   ));
     define(newSymbol("putc"),  	newPrimitive(prim_putc    ));
     define(newSymbol("cons"),  	newPrimitive(prim_cons    ));
     define(newSymbol("car"),   	newPrimitive(prim_car     ));
     define(newSymbol("cdr"),   	newPrimitive(prim_cdr     ));
-    define(newSymbol("list?"), 	newPrimitive(prim_listP   ));
-    define(newSymbol("read"),  	newPrimitive(prim_read    ));
+	define(newSymbol("list?"), 	newPrimitive(prim_listP   ));
+	define(newSymbol("read"),  	newPrimitive(prim_read    ));
     define(newSymbol("eval"),  	newPrimitive(prim_eval    ));
     define(newSymbol("apply"), 	newPrimitive(prim_apply   ));
     define(newSymbol("length"), newPrimitive(prim_length  ));
     define(newSymbol("concat"), newPrimitive(prim_concat  ));
+	define(newSymbol("return"), newPrimitive(prim_return  ));
+	define(newSymbol("break"),  newPrimitive(prim_break   ));
+	define(newSymbol("continue"),newPrimitive(prim_continue));
 
     define(newSymbol("lambda"),        newSpecial(spec_lambda));
     define(newSymbol("define"),        newSpecial(spec_define));
@@ -993,8 +1102,8 @@ int main(int argc, char **argv)
     }
 
     if (!repled) {
-	replPath("boot.grl");
-	replFile(stdin);
+		replPath("boot.grl");
+		replFile(stdin);
     }
 
     return 0;

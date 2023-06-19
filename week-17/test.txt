@@ -1,0 +1,18 @@
+#!./grcp -b
+
+(define println (lambda (x) (print x) (putc 10)))
+
+(define f
+  (lambda (x)
+    (while (< x 20)
+	  (setq x (+ x 1))
+    	  (println x)
+	  (if (= x 10) (break))
+    	  (println x)
+	  (if (= x  6) (continue))
+    	  (println x))
+	42))
+
+;(println (f 15))  ;=>  3  2  1  42  ; implicit return from f
+
+(println (f  1))  ;=> 12 11 10 666  ; explicit, early return from f
