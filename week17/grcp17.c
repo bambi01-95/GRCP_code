@@ -346,6 +346,145 @@ oop define(oop name, oop value)
     return name->Symbol.value = value;
 }
 
+typedef enum {RETURN, BREAK, CONTINUE,}buff_t;
+struct Buff{
+  struct Buff *next;
+  jmp_buf *buf;
+};
+
+struct Buff *returnBuff;
+int returnCount = 0;
+oop returnValue;
+
+struct Buff *breakBuff;
+int breakCount = 0;
+
+struct Buff *continueBuff;
+int continueCount = 0;
+
+void push(jmp_buf *buf,buff_t type){
+    struct Buff *new = GC_malloc(sizeof(struct Buff));
+    new->buf = buf;
+    switch(type){
+        case RETURN:{
+            new->next = returnBuff;
+            returnBuff = new;
+            returnCount++;
+            break;
+        }
+        case BREAK:{
+            new->next = breakBuff;
+            breakBuff = new;
+            breakCount++;
+            break;
+        }
+        case CONTINUE:{
+            new->next = continueBuff;
+            continueBuff = new;
+            continueCount++;
+            break;
+        }
+    }
+    return;
+}
+
+jmp_buf *pop(buff_t type){
+    jmp_buf *buf;
+    switch(type){
+        case RETURN:{
+            if(returnCount<1){
+                fprintf(stderr,"ERROR: pop\n");
+                exit(1);
+            }
+            buf = returnBuff->buf;
+            returnBuff = returnBuff->next;
+            returnCount--;
+            break;
+        }
+        case BREAK:{
+            if(breakCount<1){
+                fprintf(stderr,"ERROR: pop\n");
+                exit(1);
+            }
+            buf = breakBuff->buf;
+            breakBuff = breakBuff->next;
+            breakCount--;
+            break;
+        }
+        case CONTINUE:{
+            if(continueCount<1){
+                fprintf(stderr,"ERROR: pop\n");
+                exit(1);
+            }
+            buf = continueBuff->buf;
+            continueBuff = continueBuff->next;
+            continueCount--;
+            break;
+        }
+    }
+    return buf;
+}
+
+// †
+oop prim_return(oop args,oop env){
+  returnValue = eval(car(args),env);
+  if(returnCount>0){
+    jmp_buf *buf = pop(RETURN);
+    longjmp(*buf,1);
+  }
+  fprintf(stderr,"no argument in the returnBuff Array\n");
+  exit(1);
+  return nil;
+}
+
+oop prim_break(oop args,oop env){
+  if(breakCount>0){
+    jmp_buf *buf = pop(BREAK);
+    longjmp(*buf,1);
+  }
+  fprintf(stderr,"no argument in the breakBuff Array\n");
+  exit(1);
+  return nil;
+}
+
+oop prim_continue(oop args,oop env){
+  if(continueCount>0){
+    jmp_buf *buf = continueBuff->buf;
+    longjmp(*buf,1);
+  }
+  fprintf(stderr,"no argument in the continueBuff Array\n");
+  exit(1);
+  return nil;
+}
+
+oop spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
+{
+    oop env2 = env;
+    oop bindings = car(args);
+    oop exprs = cdr(args);
+    while (Object_type(bindings) == Cell) {
+		oop bind  = bindings->Cell.a;
+		oop name  = car(bind);
+		oop value = cadr(bind);
+		env2 = newCell(newCell(name, eval(value, env)), env2); // NOTE: evaluate args in ORIGINAL environment
+		bindings = bindings->Cell.d;
+    }
+    oop result = nil;
+    jmp_buf buf;
+    push(&buf,RETURN);
+    if(setjmp(buf)){
+        result = returnValue;
+    }else{
+        while (Object_type(exprs) == Cell) {
+            result = eval(exprs->Cell.a, env2);
+            exprs = exprs->Cell.d;
+        }
+        pop(RETURN);
+    }
+    return result;
+}
+
+// †
 oop apply(oop func, oop args, oop env)
 {
     switch (Object_type(func)) {
@@ -357,10 +496,17 @@ oop apply(oop func, oop args, oop env)
 	    oop cenv   = func->Closure.environment;
 	    oop value  = nil;
 	    env = pairlist(params, args, cenv);
-	    while (Object_type(body) == Cell) {
-			value = eval(body->Cell.a, env);
-			body = body->Cell.d;
-	    }
+        jmp_buf buf;
+        push(&buf,RETURN);
+        if(setjmp(buf)){
+            value = returnValue;
+        }else{
+            while (Object_type(body) == Cell) {
+                value = eval(body->Cell.a, env);
+                body = body->Cell.d;
+            }
+            pop(RETURN);
+        }
 	    return value;
 	}
 	default:
@@ -658,12 +804,24 @@ oop spec_while(oop args, oop env) // (while test expressions...)
     oop test   = car(args);
     oop result = nil;
     args = cdr(args);
-    while (nil != eval(test, env)) {
-	    oop exprs = args;
-        while (Cell == Object_type(exprs)) {
-            result = eval(exprs->Cell.a, env);
-            exprs = exprs->Cell.d;
+    jmp_buf bre_buf;
+    jmp_buf con_buf;
+    push(&bre_buf,BREAK);
+    push(&con_buf,CONTINUE);
+    if(setjmp(bre_buf)){
+        return result;
+    }
+    else{
+        setjmp(con_buf);
+        while (nil != eval(test, env)) {
+            oop exprs = args;
+            while (Cell == Object_type(exprs)) {
+                result = eval(exprs->Cell.a, env);
+                exprs = exprs->Cell.d;
+            }
         }
+        pop(BREAK);
+        pop(CONTINUE);
     }
     return result;
 }
@@ -697,73 +855,8 @@ oop spec_not(oop args, oop env) // (or exp exp exp ...)
 
 
 
-struct Buff{
-  struct Buff *next;
-  jmp_buf *buf;
-};
-
-struct Buff *buffArray;
-int buffCount = 0;
-oop returnValue;
-
-void push(jmp_buf *buf){
-    struct Buff *new = GC_malloc(sizeof(struct Buff));
-    new->buf = buf;
-    new->next = buffArray;
-    buffArray = new;
-    buffCount++;
-    return;
-}
-
-jmp_buf *pop(void){
-    if(buffCount<1){
-        printf(stderr,"ERROR: pop\n");
-        exit(1);
-    }
-    jmp_buf * buf = buffArray->buf;
-    buffArray = buffArray->next;
-    buffCount--;
-    return buf;
-}
-
-oop prim_return(oop args,oop env){
-  returnValue = eval(car(args),env);
-  if(buffCount>0){
-    jmp_buf *buf = pop();
-    longjmp(*buf,1);
-  }
-  fprintf(stderr,"no argument in the buffArray\n");
-  exit(1);
-  return nil;
-}
 
 
-oop spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
-{
-    oop env2 = env;
-    oop bindings = car(args);
-    oop exprs = cdr(args);
-    while (Object_type(bindings) == Cell) {
-		oop bind  = bindings->Cell.a;
-		oop name  = car(bind);
-		oop value = cadr(bind);
-		env2 = newCell(newCell(name, eval(value, env)), env2); // NOTE: evaluate args in ORIGINAL environment
-		bindings = bindings->Cell.d;
-    }
-    oop result = nil;
-    jmp_buf buf;
-    push(&buf);
-    if(setjmp(buf)){
-        result = returnValue;
-    }else{
-        while (Object_type(exprs) == Cell) {
-            result = eval(exprs->Cell.a, env2);
-            exprs = exprs->Cell.d;
-        }
-        pop();
-    }
-    return result;
-}
 
 oop eval(oop exp, oop env)
 {
@@ -1007,6 +1100,8 @@ int main(int argc, char **argv)
     define(newSymbol("length"), newPrimitive(prim_length  ));
     define(newSymbol("concat"), newPrimitive(prim_concat  ));
     define(newSymbol("return"), newPrimitive(prim_return  )); //grcp17
+    define(newSymbol("break"),  newPrimitive(prim_break   ));
+    define(newSymbol("continue"),newPrimitive(prim_continue));
 
     define(newSymbol("lambda"),        newSpecial(spec_lambda));
     define(newSymbol("define"),        newSpecial(spec_define));

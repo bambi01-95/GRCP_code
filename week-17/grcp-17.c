@@ -793,7 +793,15 @@ Result spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
     }
     oop result = nil;
     while (Object_type(exprs) == Cell) {
-		result = EVAL(exprs->Cell.a, env2);
+		Result _result = eval(exprs->Cell.a, env2);
+		switch(_result.intent){
+			case RET_RETURN:{
+				_result.intent = RET_RESULT;
+				return _result;
+			}
+			default:
+				result = _result.value;
+		}
 		exprs = exprs->Cell.d;
     }
     RETURN(result);

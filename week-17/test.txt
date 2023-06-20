@@ -2,6 +2,15 @@
 
 (define println (lambda (x) (print x) (putc 10)))
 
+(let ((x 0))
+  (while (< x 10)
+    (cond
+      ( (= x 1) (println 'one)  )
+      ( (= x 6) (println 'six)  )
+      ( (= x 8) (return 42)    )
+      ('t       (println 'other)))
+    (++ x)))
+	
 (define f
   (lambda (x)
     (while (< x 20)

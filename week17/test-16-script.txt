@@ -10,25 +10,31 @@
       ( (= x 8) (return 42)    )
       ('t       (println 'other)))
     (++ x)))
-    (let ((x 0))
-  (while (< x 10)
-    (cond
-      ( (= x 1) (println 'one)  )
-      ( (= x 6) (println 'six)  )
-      ('t       (println 'other)))
-    (++ x)))
-    (let ((x 0))
-  (while (< x 10)
-    (cond
-      ( (= x 1) (println 'one)  )
-      ( (= x 6) (println 'six)  )
-      ('t       (println 'other)))
-    (++ x)))
-(let ((x 0))
-  (while (< x 10)
-    (cond
-      ( (= x 1) (println 'one)  )
-      ( (= x 6) (println 'six)  )
-      ( (= x 8) (return 42)    )
-      ('t       (println 'other)))
-    (++ x)))
+
+(define a (lambda (x)
+    (while (< x 10)
+      (cond
+        ( (= x 1) (println 'one)  )
+        ( (= x 6) (println 'six)  )
+        ( (= x 8) (return 42)    )
+        ('t       (println 'other))
+      )
+
+      (++ x)
+    )
+  )
+)
+
+(define f
+  (lambda (x)
+    (while (< x 20)
+	  (setq x (+ x 1))
+    	  (println x)
+	  (if (= x 10) (break))
+    	  (println x)
+	  (if (< x  6) (continue))
+    (println x))
+	42))
+
+(a 0)
+(f 1)
