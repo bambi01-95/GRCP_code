@@ -58,10 +58,10 @@ union Object
 
 oop nil     = 0;
 
-oop sym_t			= 0;
+oop sym_t		= 0;
 oop sym_quote			= 0;
 oop sym_unquote			= 0;
-oop sym_unquote_splicing  	= 0;
+oop sym_unquote_splicing= 0;
 oop sym_quasiquote		= 0;
 
 oop newObject(type_t type)

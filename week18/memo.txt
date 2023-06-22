@@ -1,0 +1,10 @@
+count each type
+
+
+make a code like at the meeting
+
+if I cannot write a code, contact at fridaty,
+
+< prog term >
+last num 1 -> tagged immediate value
+other value -> BOXED
