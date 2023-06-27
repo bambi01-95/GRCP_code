@@ -46,11 +46,13 @@
     (if (list? list)
         (cons (fn (car list)) (map fn (cdr list))))))
 
-;; (define-syntax let
-;;   (lambda (let bindings . expressions)
-;;     `( (lambda ,(map car bindings) ,@expressions)
-;;        ,@(map cadr bindings)
-;;      )))
+(define-syntax let
+  (lambda (let bindings . expressions)
+    `( (lambda ,(map car bindings) ,@expressions)
+       ,@(map cadr bindings)
+     )
+  )
+)
 
 ;; (++ var) increments a variable
 

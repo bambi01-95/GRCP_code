@@ -1,0 +1,102 @@
+Graduation Research Project
+===========================
+
+18  Tagged immediate data values
+--------------------------------
+
+Some of our data types contain just one, simple numeric value.  Integer, for
+example, contains a single int.  When this value is 'boxed' up into an object
+it become very expensive.  The 32-bit int is placed in an object large enough
+to hold an entire object of any type, it has an additional field to hold its
+type, and the memory allocator will add many bytes of additional overhead to
+manage this object.  There is also time overhead because every time we produce
+an Integer result, even for a simple addition, we pay the price of calling
+malloc() to allocate the space for the result.
+
+    +-----------+
+    | memory    |
+    | allocator |
+    | overhead  |     +------------------------------+
+    +-----------+ <---+    pointer to the Integer    |
+    | type      |     +------------------------------+
+    +-----------+
+    | value     |
+    +-----------+
+
+On a 64-bit machine a pointer to the Integer is 64 bits wide.  This is twice
+as many bits as are needed for the actual int value stored in the Integer.
+
+Integer objects are also immutable, which means that once they are created the
+int value stored in them is never changed.
+
+The malloc() function also returns storage that is aligned pessimistically to
+be suitable to hold the largest possible data value.  On a very permissive
+machine the alignment will be at least to a 4-byte boundary, guaranteeing that
+all pointers returned from malloc() will have this form:
+
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx000
+
+This means the least significant few bits of every pointer are guaranteed to be
+zero.  We can exploit this fact to create 'fake pointers' that do not really
+point to an object in memory but instead encode a value in the pointer itself.
+
+Consider a pointer that is odd:
+
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1
+
+This cannot possibly have been returned from malloc() because of the alignment
+rules.  Since it cannot be a pointer to an object, we can place anything we
+like in the 'x' bits of this non-pointer.  For example, a 32-bit int 'i' could
+easily be placed in bits 1 to 32, like this:
+
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii1
+
+No matter what the value of 'i' might be, this non-pointer will never be
+mistaken for a pointer to an object because its least significant bit is 1.
+
+The '1' in the least significant bit is called the "tag".  If the tag is 0 then
+the pointer refers to an object in memory.  If the tag is non-zero then it
+represents an actual value of a certain type.  The tag tells you the type and
+the rest of the bit in the 'pointer' tell you the value.
+
+You can have more than one tag bit.  If malloc() guarantees pointers are aligned on
+a 2^N byte boundary then you can have up to N tag bits.  For our requirements we
+can use just a single tag bit.
+
+Given an int value i, we can trivially create a tagged immediate 'non-pointer'
+to represent it:
+
+    oop nonPointer = (oop)(((intptr_t)i << 1) | 1);
+
+The cast to intptr_t guarantees that the integer is the same width as a pointer,
+sign extended if necessary, and the bit-or with 1 turns on the tag bit.
+
+Obtaining the value stored in the integer is similarly easy:
+
+    int intValue = (intptr_t)objptr >> 1;
+
+The cast to intptr_t turns the pointer into an integer of the same width and
+the right shift discards the tag bit, moves the integer bits into the correct
+locations to represent the value directly, and preserves the sign of the
+result.
+
+Using these mechanisms we could store up to 63-bit integers as tagged immediate
+values in 64-bit pointers.
+
+Modify your interpreter to use tagged immediate Integer values.
+
+The safest way to do this is to rename the 'type' field of all objects to
+'_type' and then ensure that only newObject() and Object_type() refer to this
+field.  Then rename the 'value' member of Integer to '_value' and ensure that
+only newInteger() and Integer_value() refer to it.
+
+Modify newInteger() to return a tagged immediate pointer.
+
+Modify Object_type() to check for a tagged integer and return Integer, if
+appropriate, before trying to access the _type member stored in memory.
+
+Modify Integer_value() to return the immediate value stored in an object
+pointer.
+
+With just these few changes your interpreter should work perfectly again, but
+it should allocate no memory at all for Integer values.

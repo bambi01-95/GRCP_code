@@ -26,6 +26,7 @@ typedef Object *oop;
 typedef enum { ILLEGAL, Undefined, Integer, Float, String, Symbol, Primitive, Special, Cell, Closure } type_t;
 typedef enum { RET_RESULT, RET_RETURN, RET_BREAK, RET_CONTINUE,}return_t;
 
+int alloc[Closure+1];
 
 struct Result{
 	oop value;
@@ -66,6 +67,7 @@ oop sym_quasiquote		= 0;
 
 oop newObject(type_t type)
 {
+	alloc[type]++;
     oop obj = GC_calloc(1, sizeof(Object));
     obj->type = type;
     return obj;
@@ -81,7 +83,7 @@ type_t Object_type(oop obj)
 
 oop newInteger(int value)
 {
-    return (oop)(long)((value<<1)|1);
+    return (oop)(intptr_t)((value<<1)|1);
     // use memory
     // oop obj = newObject(Integer);
     // obj->Integer.value = value;
@@ -91,7 +93,7 @@ oop newInteger(int value)
 int Integer_value(oop obj)
 {
     assert(((intptr_t)obj&1)==1);
-    return((intptr_t)obj)>>1;
+    return(intptr_t)obj>>1;
     // use memory
     // assert(Object_type(obj) == Integer);
     // return obj->Integer.value;
@@ -944,32 +946,32 @@ oop read(FILE *fp) // read stdin and return an object, or 0 if EOF
 	return list;
     }
     if (c == '\'') {
-	oop obj = read(fp);
-	if (!obj) {
-	    fprintf(stderr, "EOF while reading quoted data\n");
-	    exit(1);
-	}
-	return newCell(sym_quote, newCell(obj, nil));
+		oop obj = read(fp);
+		if (!obj) {
+			fprintf(stderr, "EOF while reading quoted data\n");
+			exit(1);
+		}
+		return newCell(sym_quote, newCell(obj, nil));
     }
     if (c == '`') {
-	oop obj = read(fp);
-	if (!obj) {
-	    fprintf(stderr, "EOF while reading quoted data\n");
-	    exit(1);
-	}
-	return newCell(sym_quasiquote, newCell(obj, nil));
+		oop obj = read(fp);
+		if (!obj) {
+			fprintf(stderr, "EOF while reading quoted data\n");
+			exit(1);
+		}
+		return newCell(sym_quasiquote, newCell(obj, nil));
     }
     if (c == ',') {
-	oop unquote = sym_unquote;
-	int d = getc(fp);
-	if (d == '@') unquote = sym_unquote_splicing;
-	else          ungetc(d, fp);
-	oop obj = read(fp);
-	if (!obj) {
-	    fprintf(stderr, "EOF while reading quoted data\n");
-	    exit(1);
-	}
-	return newCell(unquote, newCell(obj, nil));
+		oop unquote = sym_unquote;
+		int d = getc(fp);
+		if (d == '@') unquote = sym_unquote_splicing;
+		else          ungetc(d, fp);
+		oop obj = read(fp);
+		if (!obj) {
+			fprintf(stderr, "EOF while reading quoted data\n");
+			exit(1);
+		}
+		return newCell(unquote, newCell(obj, nil));
     }
     if ('"' == c) { // string
 	char string[64];
@@ -1055,16 +1057,9 @@ void replPath(char *path)
 int main(int argc, char **argv)
 {
     GC_init();
-	printf("Float %lu\n",sizeof(struct Float));
-	// -> 8
-	printf("Closu %lu\n",sizeof(struct Closure));
-	// -> 40
-
-	printf("objct %lu\n",sizeof(union Object));
-	// -> 40
-	printf("oop   %lu\n",sizeof(oop));
-	// -> 8
-	
+	for(int i; i<Closure+1; i++){
+		alloc[i] = 0;
+	}
 	/*
 	Integer はoopのアドレスととって変わった。
 	しかし、これは本当にメモリの節約をしているのか？
@@ -1111,29 +1106,32 @@ int main(int argc, char **argv)
     define(newSymbol("not"),           newSpecial(spec_not));
     define(newSymbol("let"),           newSpecial(spec_let));
 
-    // int argn = 1, booted = 0, repled = 0;
+    int argn = 1, booted = 0, repled = 0;
 
-    // while (argn < argc) {
-	// 	char *arg = argv[argn++];
-	// 	if      (!strcmp(arg, "-v")) ++opt_v;
-	// 	else if (!strcmp(arg, "+v")) --opt_v;
-	// 	else if (!strcmp(arg, "-b")) ++booted;
-	// 	else if (!strcmp(arg, "-" )) {
-	// 		if (!booted++) replPath("boot.grl");
-	// 		replFile(stdin);
-	// 		++repled;
-	// 	}
-	// 	else {
-	// 		if (!booted++) replPath("boot.grl");
-	// 		replPath(arg);
-	// 		++repled;
-	// 	}
-    // }
+    while (argn < argc) {
+		char *arg = argv[argn++];
+		if      (!strcmp(arg, "-v")) ++opt_v;
+		else if (!strcmp(arg, "+v")) --opt_v;
+		else if (!strcmp(arg, "-b")) ++booted;
+		else if (!strcmp(arg, "-" )) {
+			if (!booted++) replPath("boot.grl");
+			replFile(stdin);
+			++repled;
+		}
+		else {
+			if (!booted++) replPath("boot.grl");
+			replPath(arg);
+			++repled;
+		}
+    }
 
-    // if (!repled) {
-	// 	replPath("boot.grl");
-	// 	replFile(stdin);
-    // }
+    if (!repled) {
+		replPath("boot.grl");
+		replFile(stdin);
+    }
+	for(int i; i<Closure+1; i++){
+		printf("%d: %d\n",i,alloc[i]);
+	}
 
     return 0;
 }
