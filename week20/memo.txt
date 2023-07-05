@@ -1,0 +1,43 @@
+2023/07/04
+bambi01-95 m058　
+
+- - - - - - - - - - - - - - - - - - - - - 
+
+CALL, num,-> 現在の位置を保存して、numの指定された関数に飛ぶ
+RET,　　　-> popでCALLの値まで戻る
+
+
+2-2
+
+int fib1[] = {
+    INT, 15, [d ]
+
+    CALL, 4, [d p]
+    DUP,     []
+    PRINT,   []
+    DROP,    []
+    HALT,    []
+
+    DUP,     [d p dd]
+    INT, 2,  []
+    LESS,    []
+    JUMPF,4, []
+    DROP,    []
+    INT, 1,  []
+    RET,     []
+
+    DUP,     []
+    INT, 1,  []
+    SUB,     []
+    CALL,-16,[]
+    
+    SWAP,    []
+    INT, 2,  []
+    SUB,     []
+    CALL,-22,[]
+    ADD,     []
+
+    INT, 1,  []
+    ADD,     []
+    RET,     []
+};

@@ -1,0 +1,14 @@
+bambi01-95 m058　
+
+week 10: add some function in .c for lisp 
+week 11: split the function into special and primitive
+week 12: add Closure?
+week 13: list allow over limited para
+week 14: define syntax functions
+week 15: add float type and string type
+week 16: gabage collection and expand 
+week 17: return, break and continue
+week 18: boxed tagged *integer located in pointer
+week 19: vm [basic vm operaton]-> INT, ADD, SUB, DEV, MUL, MOD, JUMP, JUMPF
+week 20: vm [how to work function]> CALL, SWAP, PICK, DROP, 
+week 21: vm [one stack...]
