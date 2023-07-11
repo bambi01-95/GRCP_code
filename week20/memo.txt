@@ -12,24 +12,24 @@ RET,　　　-> popでCALLの値まで戻る
 int fib1[] = {
     INT, 15, [d ]
 
-    CALL, 4, [d p]
+    CALL, 4, [d p] -> [p d]
     DUP,     []
     PRINT,   []
     DROP,    []
     HALT,    []
 
-    DUP,     [d p dd]
-    INT, 2,  []
-    LESS,    []
+    DUP,     [p d d]
+    INT, 2,  [p d d 2]
+    LESS,    [p d]
     JUMPF,4, []
-    DROP,    []
-    INT, 1,  []
-    RET,     []
+    DROP,    [p]
+    INT, 1,  [p 1] 
+    RET,     [p 1]
 
-    DUP,     []
-    INT, 1,  []
-    SUB,     []
-    CALL,-16,[]
+    DUP,     [p d d]
+    INT, 1,  [p d d 1]
+    SUB,     [p d d-1]
+    CALL,-16,[p d d-1 p]
     
     SWAP,    []
     INT, 2,  []
@@ -41,3 +41,5 @@ int fib1[] = {
     ADD,     []
     RET,     []
 };
+
+[ d p d p d d d d p p p p p d]

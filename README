@@ -12,3 +12,39 @@ week 18: boxed tagged *integer located in pointer
 week 19: vm [basic vm operaton]-> INT, ADD, SUB, DEV, MUL, MOD, JUMP, JUMPF
 week 20: vm [how to work function]> CALL, SWAP, PICK, DROP, 
 week 21: vm [one stack...]
+
+
+
+int program2[] = {
+    INT, 15,
+
+    CALL, 4,
+    DUP,
+    PRINT,
+    DROP,
+    HALT,
+
+    DUP,
+    INT, 2,
+    LESS,
+    JUMPF,4,
+    DROP,
+    INT, 1,
+    RET,    
+
+    DUP,    
+    INT, 1, 
+    SUB,    
+    CALL, -16, 
+    
+    PICK, 1,  
+    INT, 2, 
+    SUB,    
+    CALL, -23,
+    ADD,    
+    INT, 1, 
+    ADD,   
+    SWAP,
+    DROP, 
+    RET,  
+};

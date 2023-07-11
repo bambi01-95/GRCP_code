@@ -1,9 +1,8 @@
 /* --------------------------------------------
-bambi01-95 m058　
-2023/07/05
-1つのSTACKで全てのstackとpc＊を管理する
+    bambi01-95 m058　
+    2023/07/11
+    /title/ (copy vm2-2)
 --------------------------------------------*/ 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -16,9 +15,11 @@ enum {
     /*func*/PRINT, 
     /*end */HALT};
 
+
 int *stack[64];
 int size = (sizeof(stack)/sizeof(*stack));
 const int MAX = (sizeof(stack)/sizeof(*stack));
+
 
 void push(int *n){assert(size>0);stack[--size] = n;}
 void ipush(int i){push((int*)(intptr_t)i);}
@@ -61,6 +62,7 @@ int run(int *pc){
     }
     return 0;
 }
+
 
 
 int program[] = {

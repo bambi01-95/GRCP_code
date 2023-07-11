@@ -13,8 +13,8 @@ DOUBLE()とnfib()を作成
 #include <stdlib.h>
 #include <assert.h>
 
-enum { PRINT, DUP, INT, ADD, SUB, MUL, DIV, MOD, LESS, IF, JUMP, JUMPF, CALL, HALT, 
-        SWAP, PICK, DROP, RET,REL,};
+enum { PRINT, DUP, INT, ADD, SUB, MUL, DIV, MOD, LESS,  JUMP, JUMPF, CALL, HALT, 
+        SWAP, PICK, DROP, RET,};
 
 int inst[64];
 int size = (sizeof(inst)/sizeof(*inst));
@@ -23,6 +23,7 @@ const int MAX = (sizeof(inst)/sizeof(*inst));
 void push(int n){assert(size>0);inst[--size] = n;}
 int pop(){assert(size<MAX);return inst[size++];}
 int top(){return inst[size];}
+void pick(int n){push(inst[size + n]);}
 
 int *inst_pc[64];
 int size_pc = MAX;
@@ -37,18 +38,7 @@ int *pop_pc(){
     return inst_pc[size_pc++];
 }
 
-void release(){
-    int num = MAX - size;
-    if(num == 0)printf("empty\n");
-    else {
-        printf("check %d\n [ ",MAX - size);
-        while(size<MAX){
-            printf("%d, ",inst[size++]);
-        }
-        printf("]\n");
-    }
-    return;
-}
+
 
 int test_double[]  = {
     INT, 66,
@@ -67,7 +57,7 @@ int test_double[]  = {
 };
 
 
-int fib1[] = {
+int fib[] = {
     INT, 15,
 
     CALL, 4,
@@ -101,6 +91,41 @@ int fib1[] = {
 };
 
 
+int fib15[] = {
+    INT, 15,
+
+    CALL, 4,
+    DUP,
+    PRINT,
+    DROP,
+    HALT,
+
+    DUP,
+    INT, 2,
+    LESS,
+    JUMPF,4,//if(n<2)
+    DROP,
+    INT, 1,
+    RET,    //return 1;
+
+    DUP,    // n n
+    INT, 1, // n n 1
+    SUB,    // n n-1
+    CALL, -16, // n fib(n-1)
+    
+    PICK, 1,   // fib(n-1) n 
+    INT, 2, // fib(n-1) n 2
+    SUB,    // fib(n-1) n-2
+    CALL, -23,// fib(n-1) fib(n-2)
+    ADD,    // fib(n-1)+fib(n-2)
+
+    INT, 1, // fib(n-1)+fib(n-2) 1
+    ADD,    // fib(n-1)+fib(n-2)+1
+    SWAP,
+    DROP,
+    RET,    
+};
+
 
 int run(int *pc){
     for(;;){
@@ -122,9 +147,8 @@ int run(int *pc){
             case CALL:{int value = *pc++;push_pc(pc);pc +=value;continue;}
             case RET:{pc = pop_pc();continue;}
             case SWAP:{int a = pop();int b = pop();push(a);push(b);continue;}
-            case PICK:{int value = pop();continue;}
+            case PICK:{int value = *pc++;pick(value);continue;}
             case DROP:{pop();continue;}
-            case REL: {release();continue;}
             case HALT:
                 return 0;
             default:
@@ -141,6 +165,9 @@ int nfib(int n){
 }
 
 int main(){
-    run(fib1);
+    printf("vm2-1\n");
+    run(fib15);
+    printf("stock in %d elements\n",MAX - size);
     return 0;
 }
+// address to address だdファdsファdファdsファdsf

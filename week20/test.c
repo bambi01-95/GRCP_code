@@ -1,7 +1,7 @@
 /* --------------------------------------------
 bambi01-95 m058　
-2023/07/05
-1つのSTACKで全てのstackとpc＊を管理する
+2023/07/10
+following GRCP-20.txt
 --------------------------------------------*/ 
 
 #include <stdio.h>
@@ -16,24 +16,27 @@ enum {
     /*func*/PRINT, 
     /*end */HALT};
 
-int *stack[64];
-int size = (sizeof(stack)/sizeof(*stack));
-const int MAX = (sizeof(stack)/sizeof(*stack));
+int *inst[64];
+int size = (sizeof(inst)/sizeof(*inst));
+const int MAX = (sizeof(inst)/sizeof(*inst));
 
-void push(int *n){assert(size>0);stack[--size] = n;}
+
+void push(int *n){assert(size>0);inst[--size] = n;}
 void ipush(int i){push((int*)(intptr_t)i);}
 
-int *pop(){assert(size<MAX);return stack[size++];}
+int *pop(){assert(size<MAX);return inst[size++];}
 int ipop(){return(intptr_t)pop();}
 
-int *top(){return stack[size];}
-void pick(int n){push(stack[size+n]);}
+
+int *top(){return inst[size];}
+int itop(){return(intptr_t)top();}
+void pick(int n){push(inst[size + n]);}
 
 
 int run(int *pc){
     for(;;){
-        int stack = *pc++;
-        switch(stack){
+        int inst = *pc++;
+        switch(inst){
             case INT:{int value = *pc++;ipush(value);continue;}
             case DUP:{push(top());continue;};
             case DROP:{pop();continue;}
@@ -47,8 +50,18 @@ int run(int *pc){
             case MOD:{int r = ipop(); int l = ipop();ipush(l%r);continue;}
             case LESS:{int r = ipop();int l = ipop();ipush(r>l);continue;}
 
-            case CALL:{int value = *pc++;int* p = pop();push(pc);push(p);pc+=value;continue;}
-            case RET:{int *p = pop();pc = pop();push(p);continue;}
+            case CALL:{int value = *pc++;push(pc);pc+=value;continue;}
+            //pop result, pop PC, pop 1 argument, push result, continue
+            case RET:{
+                int value = *pc++;
+                int *result = pop();
+                pc = pop();
+                while(value--){
+                    pop();
+                }
+                push(result);  
+                continue;
+            }
             case JUMP:{int value = *pc++;pc += value;continue;}
             case JUMPF:{int value = *pc++;if(!pop()){pc += value;}continue;}
 
@@ -62,40 +75,31 @@ int run(int *pc){
     return 0;
 }
 
-
 int program[] = {
-    INT, 15,
-
-    CALL, 4,
-    DUP,
+    INT,    15,// n
+    CALL,   2, // n p
     PRINT,
-    DROP,
     HALT,
-
-    DUP,
-    INT, 2,
-    LESS,
-    JUMPF,4,
-    DROP,
-    INT, 1,
-    RET,    
-
-    DUP,    
-    INT, 1, 
-    SUB,    
-    CALL, -16, 
-    
-    PICK, 1,  
-    INT, 2, 
-    SUB,    
-    CALL, -23,
-    ADD,    
-    INT, 1, 
-    ADD,   
-    SWAP,
-    DROP, 
-    RET,  
+    PICK,   1,	//n p n
+    INT,    2,  //n p n 2
+    LESS,       //n p
+    JUMPF,  4,  //n p
+    INT,    1,      //n p 1
+    RET,    1,      //n p 1
+    PICK,   1,  //n p n
+    INT,    1,  //n p n 1
+    SUB,        //n p n+1
+    CALL,   -18,//n p fib(n+1)
+    PICK,   2,  //n p fib(n+1) n
+    INT,    2,  //n p fib(n+1) n 2
+    SUB,        //n p fib(n+1) n+2
+    CALL,   -25,//n p fib(n+1) fib(n+2)
+    ADD,        //n p fib(n+1)+fib(n+2)
+    INT,    1,  //n p fib(n+1)+fib(n+2) 1
+    ADD,        //n p fib(n+1)+fib(n+2)+1
+    RET,    1,  // pop result, pop PC, pop 1 argument, push result, continue        
 };
+
 
 int main(){
     printf("vm2-2\n");
