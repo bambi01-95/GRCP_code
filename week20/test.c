@@ -1,7 +1,7 @@
 /* --------------------------------------------
-bambi01-95 m058　
-2023/07/10
-following GRCP-20.txt
+    bambi01-95 m058　
+    2023/07/10
+    following GRCP-20.txt
 --------------------------------------------*/ 
 
 #include <stdio.h>
@@ -76,7 +76,7 @@ int run(int *pc){
 }
 
 int program[] = {
-    INT,    15,// n
+    INT,    25,// n
     CALL,   2, // n p
     PRINT,
     HALT,
@@ -102,7 +102,7 @@ int program[] = {
 
 
 int main(){
-    printf("vm2-2\n");
+    printf("test.c\n");
     run(program);
     printf("stock in %d elements\n",MAX - size);
     return 0;

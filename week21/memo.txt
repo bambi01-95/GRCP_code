@@ -1,3 +1,17 @@
     bambi01-95 m058　
     2023/07/11
 /////////////////////////////////////
+make a complier in the grcp21.c
+array
+
+// array_put 
+getc
+push adn pop
+
+
+
+array
+
+1 2 3 4 5 6 7 8 9
+0 1 2 3 4 5 6 7 8
+n n n n n n t n n

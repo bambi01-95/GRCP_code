@@ -23,7 +23,7 @@ union Object;
 typedef union Object Object;
 typedef Object *oop;
 
-typedef enum { ILLEGAL, Undefined, Integer, Float, String, Symbol, Primitive, Special, Cell, Closure } type_t;
+typedef enum { ILLEGAL, Undefined, Integer, Float, String, Symbol, Cell, Array, Primitive, Special,  Closure } type_t;
 typedef enum { RET_RESULT, RET_RETURN, RET_BREAK, RET_CONTINUE,} return_t;
 
 int alloc[Closure+1];
@@ -39,9 +39,10 @@ int allocation[Closure + 1];
 struct Float 	 { type_t type;  float  value; };
 struct String  	 { type_t type;  char  *value; };
 struct Symbol  	 { type_t type;  char  *name;  oop value;  oop syntax; };
+struct Array     { type_t type;  oop *elements; int size; int capacity;};
+struct Cell    	 { type_t type;  oop    a, d; };
 struct Primitive { type_t type;  prim_t function;  oop name; };
 struct Special   { type_t type;  prim_t function;  oop name; };
-struct Cell    	 { type_t type;  oop    a, d; };
 struct Closure   { type_t type;  oop    parameters, expressions, name, environment;  };
 
 union Object
@@ -51,9 +52,10 @@ union Object
     struct Float     Float;
     struct String    String;
     struct Symbol    Symbol;
+    struct Cell      Cell;
+    struct Array     Array;
     struct Primitive Primitive;
     struct Special   Special;
-    struct Cell      Cell;
     struct Closure   Closure;
 };
 
@@ -155,7 +157,72 @@ oop newSymbol(char *name)
     symbolTable[lo] = obj;
     return obj;
 }
+/* ___________________2023/07/12_______________________________________ 
+*/
+oop newArray(int capacity){
+    oop obj = newObject(Array);
+    obj->Array.size = 0;
+    obj->Array.capacity = capacity;
+    obj->Array.elements = malloc(capacity);
+    return obj;
+}
 
+int Array_size(oop obj){
+    assert(Object_type(obj)==Array);
+    return obj->Array.size;
+}
+
+oop Array_put(oop obj, int index, oop element) {
+    assert(Object_type(obj) == Array);/*[0]~[5]*/
+    if (index > obj->Array.capacity) {/* 1 ~ 6  -> index + 1*/
+        oop *newElements = malloc(index+1);
+		for(int i=0; i < obj->Array.size ;i++){
+			newElements[i] = obj->Array.elements[i];
+		}
+		obj->Array.elements = newElements;
+        obj->Array.capacity = index;
+    }
+    while (obj->Array.size < index + 1){
+		// printf("%d\n",obj->Array.size);
+        obj->Array.elements[obj->Array.size++] = nil;
+    }
+    obj->Array.elements[index] = element;
+    return obj;
+}
+
+
+oop Array_get(oop obj, int index){
+    assert(Object_type(obj)==Array);
+    if(index < obj->Array.size)
+		return obj->Array.elements[index];
+	return nil;
+};
+
+oop Array_push(oop obj,oop element){
+    assert(Object_type(obj)==Array);
+    if(obj->Array.size > obj->Array.capacity){
+        oop *newElements = malloc(obj->Array.size + 1);
+		for(int i=0;i<obj->Array.size + 1; i++){
+			newElements[i] = obj->Array.elements[i];
+		}
+		obj->Array.capacity += 1;
+    }
+    obj->Array.elements[obj->Array.size++] = element;
+    return obj;
+};
+
+oop Array_pop(oop obj){
+    assert(Object_type(obj)==Array);
+	if(obj->Array.size <= 0){
+		/* make error? */
+		return nil;
+	}
+    oop element = obj->Array.elements[--obj->Array.size];
+    obj->Array.elements[obj->Array.size] = nil;
+    return element;
+};
+
+/*--------------------------------------------------------------*/
 oop newPrimitive(prim_t function)
 {
     oop obj = newObject(Primitive);
@@ -256,6 +323,7 @@ void print(oop obj)
 	case Float:	printf("%f", Float_value(obj));				return;
 	case String:	printf("%s", String_value(obj));			return;
 	case Symbol:	printf("%s", Symbol_name(obj));				return;
+    case Array:     printf("%p, size %d, capa%d",obj,obj->Array.size,obj->Array.capacity); return;
 	case Primitive:	{
 	    printf("<primitive.");
 	    if (nil != Primitive_name(obj)) print(Primitive_name(obj));
@@ -1052,26 +1120,76 @@ void replPath(char *path)
     replFile(fp);
     fclose(fp);
 }
+// w21
+void println_Array(oop obj){
+    assert(Object_type(obj)==Array);
+    int Size = obj->Array.size;
+    if(Size==0){printf("empty\n");return;}
+    while(Size){
+		printf("%02d ",Size-1);
+        println(obj->Array.elements[--Size]);
+    }return;
+}
 
+void test_put_get(){
+	oop a = newArray(10);
+	// set over capa? ...
+	a = Array_put(a,7,sym_quote);
+	a = Array_put(a,15,sym_t);
+	a = Array_put(a,4,sym_quasiquote);
+	println_Array(a);
+	putchar('\n');
+	// return same value? 
+	println(Array_get(a,7));
+	println(Array_get(a,15));
+	println(Array_get(a,4));
+	println(Array_get(a,3));
+	// return nil, over size
+	println(Array_get(a,30));
+	return ;
+}
+
+void test_push_pop(){
+	oop a = newArray(10);
+	Array_push(a,sym_t);
+	println(Array_pop(a));
+	println(Array_pop(a));
+	return ;
+	Array_push(a,sym_quote);
+	Array_push(a,sym_quasiquote);
+	Array_push(a,sym_unquote);
+	println(Array_pop(a));
+	println(Array_pop(a));
+	Array_push(a,sym_t);
+	Array_push(a,sym_quote);
+	println(Array_pop(a));
+	println(Array_pop(a));
+	println(Array_pop(a));
+	println(Array_pop(a));
+
+	println(Array_pop(a));
+	println(Array_pop(a));
+	return;
+}
 
 int main(int argc, char **argv)
 {
+
     GC_init();
+
 	for(int i; i<Closure+1; i++){
 		alloc[i] = 0;
 	}
-	/*
-	Integer はoopのアドレスととって変わった。
-	しかし、これは本当にメモリの節約をしているのか？
 
-	*/
-    nil        	         = newObject(Undefined);
-
+    nil        	     = newObject(Undefined);
     sym_t      		 = newSymbol("t");
     sym_quote 		 = newSymbol("quote");
     sym_unquote 	 = newSymbol("unquote");
     sym_unquote_splicing = newSymbol("unquote-splicing");
     sym_quasiquote 	 = newSymbol("quasiquote");
+	// test_put_get();
+	test_push_pop();
+	return 0;
 
     define(newSymbol("+"),     	newPrimitive(prim_add     ));
     define(newSymbol("-"),     	newPrimitive(prim_subtract));

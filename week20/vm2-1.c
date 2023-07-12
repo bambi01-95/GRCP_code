@@ -165,7 +165,7 @@ int nfib(int n){
 }
 
 int main(){
-    printf("vm2-1\n");
+    printf("vm2-1.c\n");
     run(fib15);
     printf("stock in %d elements\n",MAX - size);
     return 0;

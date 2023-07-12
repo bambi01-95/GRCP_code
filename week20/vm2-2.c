@@ -1,7 +1,7 @@
 /* --------------------------------------------
-bambi01-95 m058　
-2023/07/05
-1つのSTACKで全てのstackとpc＊を管理する
+    bambi01-95 m058　
+    2023/07/05
+    1つのSTACKで全てのstackとpc＊を管理する
 --------------------------------------------*/ 
 
 #include <stdio.h>
@@ -49,6 +49,7 @@ int run(int *pc){
 
             case CALL:{int value = *pc++;int* p = pop();push(pc);push(p);pc+=value;continue;}
             case RET:{int *p = pop();pc = pop();push(p);continue;}
+
             case JUMP:{int value = *pc++;pc += value;continue;}
             case JUMPF:{int value = *pc++;if(!pop()){pc += value;}continue;}
 
@@ -98,7 +99,7 @@ int program[] = {
 };
 
 int main(){
-    printf("vm2-2\n");
+    printf("vm2-2.c\n");
     run(program);
     printf("stock in %d elements\n",MAX - size);
     return 0;
