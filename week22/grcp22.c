@@ -1,4 +1,3 @@
-
 #ifndef USE_GC
 # define USE_GC 1	// set to 0 (or comment out this line) to disable GC
 #endif
@@ -24,7 +23,7 @@ union Object;
 typedef union Object Object;
 typedef Object *oop;
 
-typedef enum { ILLEGAL, Undefined, Integer, Float, String, Symbol, Cell, Array, Primitive, Special,  Closure } type_t;
+typedef enum { ILLEGAL, Undefined, Integer, Float, String, Symbol, Cell, Primitive, Special, Closure, Array, } type_t;
 typedef enum { RET_RESULT, RET_RETURN, RET_BREAK, RET_CONTINUE,} return_t;
 
 int alloc[Closure+1];
@@ -158,8 +157,7 @@ oop newSymbol(char *name)
     symbolTable[lo] = obj;
     return obj;
 }
-/* ___________________2023/07/12__________________________ †
-*/
+
 oop newArray(int capacity){
     oop obj = newObject(Array);
     obj->Array.size = 0;
@@ -214,7 +212,7 @@ oop Array_pop(oop obj){
     return element;
 };
 
-/*--------------------------------------------------------------*/
+
 oop newPrimitive(prim_t function)
 {
     oop obj = newObject(Primitive);
@@ -546,14 +544,14 @@ Result prim_less(oop args, oop env)
 Result prim_greater(oop args, oop env)
 {
     if (Object_type(args) != Cell || Object_type(args->Cell.d) != Cell) {
-	printf("not enough arguments to <\n");
-	exit(1);
+        printf("not enough arguments to <\n");
+        exit(1);
     }
     oop lhs = args->Cell.a;
     oop rhs = args->Cell.d->Cell.a;
     if (Object_type(lhs) != Integer || Object_type(rhs) != Integer) {
-	printf("non-integer argument to <\n");
-	exit(1);
+        printf("non-integer argument to <\n");
+        exit(1);
     }
     RETURN(((intptr_t)lhs > (intptr_t)rhs)? sym_t : nil);
 }
@@ -733,8 +731,8 @@ Result spec_define(oop args, oop env)
     oop name  = car(args);
     oop value = car(cdr(args));
     if (Object_type(name) != Symbol) {
-	fprintf(stderr, "define: name is not a symbol\n");
-	exit(1);
+        fprintf(stderr, "define: name is not a symbol\n");
+        exit(1);
     }
     value = EVAL(value, env);
     RETURN(define(name, value));
@@ -1110,144 +1108,130 @@ void replPath(char *path)
     replFile(fp);
     fclose(fp);
 }
-// w21
-void println_Array(oop obj){
-	println(obj);
-    assert(Object_type(obj)==Array);
-    int Size = obj->Array.size;
-    if(Size==0){printf("empty\n");return;}
-    while(Size){
-		printf("%02d ",Size-1);
-        println(obj->Array.elements[--Size]);
-    }return;
-}
-
-void test_put_get(){
-	oop a = newArray(10);
-	// set over capa? ...
-	Array_put(a,7,sym_quote);
-	Array_put(a,15,sym_t);
-	Array_put(a,4,sym_quasiquote);
-	println_Array(a);
-	putchar('\n');
-	// return same value? 
-	println(Array_get(a,7));
-	println(Array_get(a,15));
-	println(Array_get(a,4));
-	println(Array_get(a,3));
-	// return nil, over size
-	println(Array_get(a,30));
-	return ;
-}
-
-void test_push_pop(){
-	oop a_capa0 = newArray(0);
-	// push over size and capa
-	Array_push(a_capa0,newSymbol("a"));
-	oop a = newArray(10);
-	// pop from size 0 empty array
-	println(Array_pop(a));
-	// rand push and pop 
-	Array_push(a,newSymbol("c"));
-	Array_push(a,newSymbol("c"));
-	Array_push(a,newSymbol("b"));
-	println(Array_pop(a));
-	println(Array_pop(a));
-	Array_push(a,newSymbol("b"));
-	Array_push(a,newSymbol("a"));
-	println(Array_pop(a));
-	println(Array_pop(a));
-	println(Array_pop(a));
-	return;
-}
-/*
-	1.Arrays should behave as if they are infinitely large and filled with 'nil'.
-	Their capacity and size should only be modified when it is necessary to do so.
-	The capacity should only ever increase.
-*/
 
 /*
-	2.When a new array is created the initial size should be 0 and the initial
-	capacity as indicated by the argument value.
-*/
-void test2(){
-	oop a = newArray(5);
-	printf("size %d, capacity %d\n", a->Array.size, a->Array.capacity);
-	// -> size 0, capacity 5
-	return;
-}
-/*
-	3.When adding an element (using Array_put or Array_push) you should expand the
-	capacity of the elements (if necessary) before increasing the size (if required).
-	When storing a new element beyond the current size you should also fill any
-	elements between the old and new size with 'nil'.
-*/
-void test3(){
-	oop a = newArray(3);
-	Array_put(a,1, newSymbol("that"));
-
-	println_Array(a);
-	Array_put(a,5,newSymbol("this"));	//size 5 cap5 
-	println_Array(a);
-
-	oop b = newArray(3);
-	Array_push(b,newSymbol("this"));//0
-	Array_push(b,newSymbol("this"));//1
-	Array_push(b,newSymbol("this"));//2
-	println_Array(b);
-	Array_push(b,newSymbol("that"));//3
-	Array_push(b,newSymbol("that"));//4
-	Array_push(b,newSymbol("that"));//5
-	println_Array(b);					//size 5 cap 5 
-	return;
-}
-/*
-	4.When accessing an element (using Array_get) beyond the current size you should
-	return 'nil', without modifying anything at all about the array.
-
-	over cap is included? but array behave inifinity... it is included
-*/
-void test4(){
-	oop a = newArray(10);
-	for(int i = 0;i<5;i++){
-		Array_push(a,newSymbol("this"));
-	}
-	println(Array_get(a, 3));
-	println(Array_get(a,8));
-	println(Array_get(a,15));
-	return;
-}
-/*
-	5.Pushing an element should be equivalent to 'put' with the index set to the
-	current size of the array.
-*/
-void test5(){
-	oop a = newArray(5);
-	Array_put(a,5,newSymbol("that"));
-	Array_push(a, newSymbol("this"));
-	println_Array(a);
-	return;
-}
-/*
-	6.Popping the last element from the an array should reduce the size but not the
-	capacity.
-*/
-void test6(){
-	oop a = newArray(5);
-	Array_push(a, newSymbol("this"));
-	Array_push(a, newSymbol("this"));
-	Array_push(a, newSymbol("this"));
-	Array_pop(a);
-	Array_pop(a);
-	println_Array(a);
-	return ;
-}
-
-
+-------------------------2023/07/18------------------------
 //†
+// 2023/07/18
+// reading array
+// define 
+*/
+
+enum {HALT, LITERAL, VARIABLE, CALL,};
+
+oop run(oop program,oop env){
+    int pc = 0;
+    oop stack = newArray(10);
+    for(;;){
+        oop inst = Array_get(program,pc++);
+        switch(Integer_value(inst)){
+            case LITERAL:{
+                oop value = Array_get(program,pc++); 
+                Array_push(stack,value);
+                continue;
+            }
+            case VARIABLE:{
+                oop name = Array_get(program,pc++);
+                oop ass = assoc(name,env);
+                if (ass != nil) {
+                    assert(Object_type(ass) == Cell);
+                    Array_push(stack,(ass->Cell.d));
+                    continue;
+                }
+                if (name->Symbol.value){
+                    Array_push(stack,name->Symbol.value);
+                    continue;
+                }
+                fprintf(stderr, "undefined variable: %s\n", name->Symbol.name);
+                exit(1);
+                continue;
+            }
+            case CALL:{
+                oop value = Array_get(program,pc++);
+                oop func = Array_pop(stack);
+                int n = Integer_value(value);
+                oop args = nil;
+                while(n--){
+                    args = newCell(Array_pop(stack),args);
+                }
+                oop result = nil;
+                switch(Object_type(func)){
+                    case Primitive:{
+                        result = func->Primitive.function(args, env).value;
+                        break;
+                    }
+                    default:{
+                        fprintf(stderr,"cannot call\n");
+                        exit(1);
+                    }
+                }
+                Array_push(stack,result);
+                continue;
+            }
+            case HALT:{
+                if(Array_size(stack)==1){
+                    return Array_pop(stack);
+                }
+                printf("HALT with %d items on stack\n",Array_size(stack));
+                return nil;
+            }
+        }
+    }
+}
+
+// omit writing
+#define gen(X) Array_push(program,X)
+#define genI(A) gen(newInteger(A))
+#define genS(A) gen(newSymbol(A))
+#define genII(OP,A) genI(OP); genI(A)
+#define genIS(OP,A) genI(OP); genS(A)
+#define genIO(OP,A) genI(OP); gen(A)
+
+void compile(oop program,oop exp, oop env);
+
+// (+ 1 2) -> (1 2) -> (2 nil) -> nil
+// 2 -> 1 -> + 
+
+int compileArgs(oop program,oop exp,oop env){
+    if (Object_type(exp) != Cell) return 0;
+    int n = compileArgs(program, exp->Cell.d, env);
+    compile(program,exp->Cell.a,env);
+    return n + 1;
+}
+
+void compile(oop program,oop exp, oop env){
+    switch(Object_type(exp)){
+        case Float:
+        case String:
+        case Integer:{
+            genIO(LITERAL,exp);
+            break;
+        }
+        case Symbol:{
+            genIO(VARIABLE,exp);
+            break;
+        }
+        case Cell:{
+            int n = compileArgs(program,exp,env);
+            genII(CALL, n-1);
+            break;
+        }
+        default:{
+            fprintf(stderr,"cannot compile\n");
+            exit(1);
+        }
+    }
+}
+
+oop compileProgram(oop exp, oop env){
+    oop program = newArray(10);
+    compile(program,exp,env);
+    genI(HALT);
+    return program;
+}
+
 int main(int argc, char **argv)
 {
-
     GC_init();
 
 	for(int i; i<Closure+1; i++){
@@ -1256,18 +1240,11 @@ int main(int argc, char **argv)
 
     nil        	     = newObject(Undefined);
     sym_t      		 = newSymbol("t");
+
     sym_quote 		 = newSymbol("quote");
     sym_unquote 	 = newSymbol("unquote");
     sym_unquote_splicing = newSymbol("unquote-splicing");
     sym_quasiquote 	 = newSymbol("quasiquote");
-	// test_put_get();
-	// test_push_pop();
-	// test2(); // OK
-	test3(); // 
-	// test4(); //OK
-	// test5(); //maybe OK
-	// test6(); // OK
-	return 0;
 
     define(newSymbol("+"),     	newPrimitive(prim_add     ));
     define(newSymbol("-"),     	newPrimitive(prim_subtract));
@@ -1293,17 +1270,23 @@ int main(int argc, char **argv)
     define(newSymbol("lambda"),        newSpecial(spec_lambda));
     define(newSymbol("define"),        newSpecial(spec_define));
     define(newSymbol("define-syntax"), newSpecial(spec_define_syntax));
-    define(newSymbol("setq"),          newSpecial(spec_setq));
-    define(newSymbol("quote"),         newSpecial(spec_quote));
-    define(newSymbol("if"),            newSpecial(spec_if));
-    define(newSymbol("while"),         newSpecial(spec_while));
-    define(newSymbol("and"),           newSpecial(spec_and));
-    define(newSymbol("or"),            newSpecial(spec_or));
-    define(newSymbol("not"),           newSpecial(spec_not));
-    define(newSymbol("let"),           newSpecial(spec_let));
+    define(newSymbol("setq"),          newSpecial(spec_setq  ));
+    define(newSymbol("quote"),         newSpecial(spec_quote ));
+    define(newSymbol("if"),            newSpecial(spec_if    ));
+    define(newSymbol("while"),         newSpecial(spec_while ));
+    define(newSymbol("and"),           newSpecial(spec_and   ));
+    define(newSymbol("or"),            newSpecial(spec_or    ));
+    define(newSymbol("not"),           newSpecial(spec_not   ));
+    define(newSymbol("let"),           newSpecial(spec_let   ));
 
+    for(;;){
+        oop program = read(stdin);
+        program = compileProgram(program, nil);
+        println(run(program, nil));
+    }
+    return 0;
+    
     int argn = 1, booted = 0, repled = 0;
-
     while (argn < argc) {
 		char *arg = argv[argn++];
 		if      (!strcmp(arg, "-v")) ++opt_v;
@@ -1320,7 +1303,6 @@ int main(int argc, char **argv)
 			++repled;
 		}
     }
-
     if (!repled) {
 		replPath("boot.grl");
 		replFile(stdin);
