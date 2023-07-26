@@ -1,0 +1,45 @@
+(define a 0)
+
+
+
+(while (< a 10)
+    (println (setq a (+ a 1))))
+
+(define a 0)
+
+(while (< a 10)
+    (setq a (+ a 1))
+    (println a))
+
+stop
+(define a 0)
+(while (< a 10)
+    (setq a (+ a 1))
+    (print a)
+        (print a)
+    (println a))
+stop
+(while (< a 10)
+    (if (< a 5)
+        (println a)
+        (println (+ a a)))
+    (setq a (+ a 1))
+)
+
+
+
+stop
+
+stop
+
+literal nil
+condition
+jumpf number
+
+consequent
+jump
+
+alternate<- jumpf
+
+done.<-jump
+

@@ -59,13 +59,17 @@ union Object
     struct Closure   Closure;
 };
 
-oop nil     = 0;
+oop nil                 = 0;
 
-oop sym_t		= 0;
+oop sym_t		        = 0;
 oop sym_quote			= 0;
 oop sym_unquote			= 0;
 oop sym_unquote_splicing= 0;
 oop sym_quasiquote		= 0;
+oop sym_define          = 0;
+oop sym_setq            = 0;
+oop sym_while           = 0;
+oop sym_if              = 0;
 
 oop newObject(type_t type)
 {
@@ -501,6 +505,7 @@ Result prim_add(oop args, oop env)
     exit(1);
     RETURN(nil);
 }
+
 Result prim_subtract(oop args,oop env){
     if (Object_type(args) != Cell) {
 		printf("not enough arguments to -\n");
@@ -594,6 +599,18 @@ Result prim_print(oop args, oop env)
     }
     RETURN(value);
 }
+
+Result prim_println(oop args, oop env)
+{
+    oop value = nil;
+    while (Object_type(args) == Cell) {
+        value = args->Cell.a;
+        println(value);
+        args = args->Cell.d;
+    }
+    RETURN(value);
+}
+
 
 Result prim_putc(oop args, oop env)
 {
@@ -1116,16 +1133,9 @@ void replPath(char *path)
     reading array
     define 
 */
+    /* 0    1           2       3       4      5    6       7   8*/
+enum {HALT, LITERAL, VARIABLE, CALL, DEFINE, SETQ, JUMP, JUMPF,DROP,};
 
-enum {HALT, LITERAL, VARIABLE, CALL,};
-
-/*
-(define a 10) 
-=> literal, 10
-=> variable, a(ERROR: undefined variable)
-=> variable, define(sepc_func)
-=> call,
-*/
 oop execute(oop program,oop env){
     int pc = 0;
     oop stack = newArray(10);
@@ -1176,6 +1186,40 @@ oop execute(oop program,oop env){
                 Array_push(stack,result);
                 continue;
             }
+            case DEFINE:{
+                oop name  = Array_get(program,pc++); 
+                oop value = Array_pop(stack);
+                Array_push(stack,value);//->Array_top();
+                name->Symbol.value = value;
+                continue;
+            }
+            case SETQ:{
+                oop name  = Array_get(program,pc++); 
+                oop value = Array_pop(stack);
+                Array_push(stack,value);//->Array_top();
+                oop ass   = assoc(name,env);
+                if (Object_type(ass) == Cell){
+                    ass->Cell.d = value;
+                }else{
+                    name->Symbol.value = value; 
+                }
+                continue;
+            }
+            case DROP:{
+                Array_pop(stack);//-> POP()
+                continue;
+            }
+            case JUMPF:{
+                int offset = Integer_value(Array_get(program,pc++)); 
+                oop cond = Array_pop(stack);
+                if(cond == nil)pc += offset;
+                continue;
+            }
+            case JUMP:{
+                int offset = Integer_value(Array_get(program,pc++)); 
+                pc += offset;
+                continue;
+            }
             case HALT:{
                 if(Array_size(stack)==1){
                     return Array_pop(stack);
@@ -1198,13 +1242,30 @@ oop execute(oop program,oop env){
 void compile(oop program,oop exp, oop env);
 
 // (+ 1 2) -> (1 2) -> (2 nil) -> nil
-// 2 -> 1 -> + 
+// 2 -> 1 -> +
 int compileArgs(oop program,oop exp,oop env){
     if (Object_type(exp) != Cell) return 0;
     int n = compileArgs(program, exp->Cell.d, env);
     compile(program,exp->Cell.a,env);
     return n + 1;
 }
+
+int compileBody(oop program,oop exp, oop env){
+    int count = 0;
+    if(exp == nil)return 0;
+    for(;;){
+        if(Object_type(exp)==Cell){
+            count += 1;
+            emitI(DROP);
+            compile(program, exp->Cell.a, env);
+            exp = exp->Cell.d;
+        }
+        else{
+            return (count == 1)?0:1;
+        }
+    }
+}
+
 
 void compile(oop program,oop exp, oop env){
     switch(Object_type(exp)){
@@ -1219,6 +1280,72 @@ void compile(oop program,oop exp, oop env){
             break;
         }
         case Cell:{
+            oop head = exp->Cell.a;
+            if (head == sym_define){// (define symbol value)
+                oop name = cadr(exp);
+                oop valu = caddr(exp);
+                if (Object_type(name) != Symbol){
+                    fprintf(stderr,"define [complie]\n");
+                    exit(1);
+                }
+                compile(program,valu,env);
+                emitIO(DEFINE, name);
+                break;
+            }
+            if (head == sym_setq){// (setq symbol value)
+                oop name = cadr(exp);
+                oop valu = caddr(exp);
+                if (Object_type(name) != Symbol){
+                    fprintf(stderr,"setq [complie]\n");
+                    exit(1);
+                }
+                compile(program,valu,env);
+                emitIO(SETQ, name);
+                break;
+            }
+            if (head == sym_while){// (while (cond) body...)
+                oop cond = cadr(exp);
+                oop body = cddr(exp);
+
+                emitIO(LITERAL,nil);int p_cond = program->Array.size;// 
+                compile(program,cond,env);
+                emitII(JUMPF,0);int p_jumpf = program->Array.size;
+                /* whlie */
+                int i = compileBody(program,body,env);
+                emitII(JUMP, 0);int p_jump = program->Array.size;
+                /* done*/
+                int p_done = p_jump;//should be remove
+                /* jumpf */
+                
+                Array_put(program,p_jumpf-1,newInteger(p_done-p_jumpf-1+i));
+                /* jump  */
+                Array_put(program,p_jump -1,newInteger(p_cond-p_jump));
+                break;
+            }
+            if (head == sym_if){//(if (cond) (cons) (altr))
+                oop cond = cadr(exp);
+                oop cons = caddr(exp);
+                oop altr = caddr(cdr(exp));
+
+
+                compile(program,cond,env);
+                emitII(JUMPF,0);//->else
+                int jump1 = program->Array.size;
+                /*  if  */
+                compile(program,cons,env);
+                emitII(JUMP,0);//->done
+                int jump2 = program->Array.size;
+                /* else */
+                int p_else    = program->Array.size;
+                compile(program,altr,env);
+                /* done */
+                int p_done = program->Array.size;
+                /* jumpf */
+                Array_put(program, jump1-1, newInteger(p_else - jump1));
+                /* jump  */
+                Array_put(program, jump2-1, newInteger(p_done - jump2));
+                break;
+            }
             int n = compileArgs(program,exp,env);
             emitII(CALL, n-1);
             break;
@@ -1237,6 +1364,19 @@ oop compileProgram(oop exp, oop env){
     return program;
 }
 
+void println_Array(oop obj){
+	println(obj);
+    assert(Object_type(obj)==Array);
+    int Size = obj->Array.size;
+    if(Size==0){printf("empty\n");return;}
+    while(Size){
+        print(obj->Array.elements[--Size]);
+        putchar(' ');
+    }
+    putchar('\n');
+    return;
+}
+
 int main(int argc, char **argv)
 {
     GC_init();
@@ -1253,6 +1393,11 @@ int main(int argc, char **argv)
     sym_unquote_splicing = newSymbol("unquote-splicing");
     sym_quasiquote 	 = newSymbol("quasiquote");
 
+    sym_define       = newSymbol("define");
+    sym_setq         = newSymbol("setq");
+    sym_while        = newSymbol("while");
+    sym_if           = newSymbol("if");
+
     define(newSymbol("+"),     	newPrimitive(prim_add     ));
     define(newSymbol("-"),     	newPrimitive(prim_subtract));
     define(newSymbol("*"),     	newPrimitive(prim_multiply));
@@ -1260,6 +1405,7 @@ int main(int argc, char **argv)
 	define(newSymbol(">"),      newPrimitive(prim_greater ));
     define(newSymbol("="),     	newPrimitive(prim_equal   ));
     define(newSymbol("print"), 	newPrimitive(prim_print   ));
+    define(newSymbol("println"),newPrimitive(prim_println ));
     define(newSymbol("putc"),  	newPrimitive(prim_putc    ));
     define(newSymbol("cons"),  	newPrimitive(prim_cons    ));
     define(newSymbol("car"),   	newPrimitive(prim_car     ));
@@ -1289,6 +1435,7 @@ int main(int argc, char **argv)
     for(;;){
         oop program = read(stdin);
         program = compileProgram(program, nil);
+        println_Array(program);
         println(execute(program, nil));
     }
     return 0;

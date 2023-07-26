@@ -66,7 +66,9 @@ oop sym_quote			= 0;
 oop sym_unquote			= 0;
 oop sym_unquote_splicing= 0;
 oop sym_quasiquote		= 0;
-
+oop sym_define          = 0;
+oop sym_setq            = 0;
+oop sym_while           = 0;
 oop newObject(type_t type)
 {
 	alloc[type]++;
@@ -1117,7 +1119,7 @@ void replPath(char *path)
     define 
 */
 
-enum {HALT, LITERAL, VARIABLE, CALL,};
+enum {HALT, LITERAL, VARIABLE, CALL, DEFINE, SETQ, JUMP, JUMPF,DROP,};
 
 /*
 (define a 10) 
@@ -1176,6 +1178,40 @@ oop execute(oop program,oop env){
                 Array_push(stack,result);
                 continue;
             }
+            case DEFINE:{
+                oop name  = Array_get(program,pc++); 
+                oop value = Array_pop(stack);
+                Array_push(stack,value);//->Array_top();
+                name->Symbol.value = value;
+                continue;
+            }
+            case SETQ:{
+                oop name  = Array_get(program,pc++); 
+                oop value = Array_pop(stack);
+                Array_push(stack,value);//->Array_top();
+                oop ass   = assoc(name,env);
+                if (Object_type(ass) == Cell){
+                    ass->Cell.d = value;
+                }else{
+                    name->Symbol.value = value; 
+                }
+                continue;
+            }
+            case DROP:{
+                Array_pop(stack);//-> POP()
+                continue;
+            }
+            case JUMPF:{
+                int offset = Integer_value(Array_get(program,pc++)); 
+                oop cond = Array_pop(stack);
+                if(cond == nil)pc += offset;
+                continue;
+            }
+            case JUMP:{
+                int offset = Integer_value(Array_get(program,pc++)); 
+                pc += offset;
+                continue;
+            }
             case HALT:{
                 if(Array_size(stack)==1){
                     return Array_pop(stack);
@@ -1198,12 +1234,23 @@ oop execute(oop program,oop env){
 void compile(oop program,oop exp, oop env);
 
 // (+ 1 2) -> (1 2) -> (2 nil) -> nil
-// 2 -> 1 -> + 
+// 2 -> 1 -> +
 int compileArgs(oop program,oop exp,oop env){
     if (Object_type(exp) != Cell) return 0;
     int n = compileArgs(program, exp->Cell.d, env);
     compile(program,exp->Cell.a,env);
     return n + 1;
+}
+void compileBody(oop program,oop exp, oop env){
+    for(;;){
+        compile(program,exp->Cell.a,env);
+        if(Object_type(exp)==Cell){
+            exp = exp->Cell.d;
+        }
+        else{
+            break;
+        }
+    }
 }
 
 void compile(oop program,oop exp, oop env){
@@ -1215,10 +1262,56 @@ void compile(oop program,oop exp, oop env){
             break;
         }
         case Symbol:{
+
             emitIO(VARIABLE,exp);
             break;
         }
         case Cell:{
+            oop head = exp->Cell.a;
+            if (head == sym_define){// (define symbol value)
+                oop name = cadr(exp);
+                oop valu = caddr(exp);
+                if (Object_type(name) != Symbol){
+                    fprintf(stderr,"define [complie]\n");
+                    exit(1);
+                }
+                compile(program,valu,env);
+                emitIO(DEFINE, name);
+                break;
+            }
+            if (head == sym_setq){// (setq symbol value)
+                oop name = cadr(exp);
+                oop valu = caddr(exp);
+                if (Object_type(name) != Symbol){
+                    fprintf(stderr,"setq [complie]\n");
+                    exit(1);
+                }
+                compile(program,valu,env);
+                emitIO(SETQ, name);
+                break;
+            }
+            if (head == sym_while){// (while (cond) body...)
+                oop cond = cadr(exp);
+                oop body = caddr(exp);
+
+                emitIO(LITERAL,nil);
+                int L1 = program->Array.size;
+                compile(program,cond,env);
+                emitII(JUMPF,0);
+                int L2 = program->Array.size;
+                emitI(DROP);
+                compile(program,body,env);
+                int L3 = program->Array.size;
+                emitII(JUMP,0);
+                int L4 = program->Array.size;
+                /* what is L3 used for, and L4 - L2 */
+                /* jumpf */
+                Array_put(program,L2-1,newInteger(L4-L2));
+                /* jump  */
+                Array_put(program,L4-1,newInteger(L1-L4));
+                break;
+            }
+
             int n = compileArgs(program,exp,env);
             emitII(CALL, n-1);
             break;
@@ -1253,6 +1346,9 @@ int main(int argc, char **argv)
     sym_unquote_splicing = newSymbol("unquote-splicing");
     sym_quasiquote 	 = newSymbol("quasiquote");
 
+    sym_define       = newSymbol("define");
+    sym_setq         = newSymbol("setq");
+    sym_while        = newSymbol("while");
     define(newSymbol("+"),     	newPrimitive(prim_add     ));
     define(newSymbol("-"),     	newPrimitive(prim_subtract));
     define(newSymbol("*"),     	newPrimitive(prim_multiply));

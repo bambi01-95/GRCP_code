@@ -501,6 +501,7 @@ Result prim_add(oop args, oop env)
     exit(1);
     RETURN(nil);
 }
+
 Result prim_subtract(oop args,oop env){
     if (Object_type(args) != Cell) {
 		printf("not enough arguments to -\n");
@@ -626,7 +627,6 @@ Result prim_listP(oop args, oop env)
 }
 
 oop read(FILE *fp);
-
 Result prim_read(oop args, oop env)
 {
     RETURN(read(stdin));
@@ -730,8 +730,10 @@ Result spec_define(oop args, oop env)
 {
     oop name  = car(args);
     oop value = car(cdr(args));
+    println(name);
+    println(value);
     if (Object_type(name) != Symbol) {
-        fprintf(stderr, "define: name is not a symbol\n");
+        fprintf(stderr, "name is not a symbol[sepc_define]\n");
         exit(1);
     }
     value = EVAL(value, env);
@@ -844,6 +846,8 @@ Result spec_not(oop args, oop env) // (or exp exp exp ...)
     RETURN(car(args) == nil ? sym_t : nil);
 }
 
+
+
 Result spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
 {
     oop env2 = env;
@@ -887,7 +891,7 @@ Result eval(oop exp, oop env)
 			RETURN(ass->Cell.d);
 	    }
 	    if (exp->Symbol.value)RETURN(exp->Symbol.value);
-	    fprintf(stderr, "undefined variable: %s\n", exp->Symbol.name);
+	    fprintf(stderr, "undefined variable: %s[eval]\n", exp->Symbol.name);
 	    exit(1);
 	    break;
 	}
@@ -935,71 +939,102 @@ oop revlist(oop list, oop tail)
     return tail;
 }
 
+
+
+
+
+enum {HALT, LITERAL, VARIABLE, CALL, DEF,};
+
+#define emit(X) Array_push(program,X)
+#define emitI(A) emit(newInteger(A))
+#define emitS(A) emit(newSymbol(A))
+#define emitII(OP,A) emitI(OP); emitI(A)
+#define emitIS(OP,A) emitI(OP); emitS(A)
+#define emitIO(OP,A) emitI(OP); emit(A)
+
+void compile(oop program,oop exp, oop env);
+
 oop read(FILE *fp) // read stdin and return an object, or 0 if EOF
 {
     int c;
     c = nextchar(fp);
     if (isdigit(c)) { // number, float is: digits+ . digits* [e [-+] digits+]?
-	char buf[32];
-	int i = 0, dotted = 0;
-	while ((i < sizeof(buf) - 1 && isdigit(c))) {
-	    buf[i++] = c;
-	    c = getc(fp);
-	}
-	if ((i < sizeof(buf) - 1 && '.'== c)) {
-	    buf[i++] = c;
-	    c = getc(fp);
-	    ++dotted;
-	    while ((i < sizeof(buf) - 1 && isdigit(c))) {
-		buf[i++] = c;
-		c = getc(fp);
-	    }
-	}
-	ungetc(c, fp);
-	buf[i] = 0;
-	if (dotted && i > 1) return newFloat(atof(buf));
-	return newInteger(atoi(buf));
+        char buf[32];
+        int i = 0, dotted = 0;
+        while ((i < sizeof(buf) - 1 && isdigit(c))) {
+            buf[i++] = c;
+            c = getc(fp);
+        }
+        if ((i < sizeof(buf) - 1 && '.'== c)) {
+            buf[i++] = c;
+            c = getc(fp);
+            ++dotted;
+            while ((i < sizeof(buf) - 1 && isdigit(c))) {
+            buf[i++] = c;
+            c = getc(fp);
+            }
+        }
+        ungetc(c, fp);
+        buf[i] = 0;
+        if (dotted && i > 1) return newFloat(atof(buf));
+        return newInteger(atoi(buf));
     }
     if (isident(c)) { // symbol
-	char string[64];
-	int length = 0;
-	do {
-	    string[length++] = c;
-	    c = getc(fp);
-	} while((isident(c) || isdigit(c)) && length < sizeof(string) - 1);
-	ungetc(c, fp);
-	string[length] = '\0';
-	if (!strcmp(string, "nil")) return nil;
-	return newSymbol(string);
+        char string[64];
+        int length = 0;
+        do {
+            string[length++] = c;
+            c = getc(fp);
+        } while((isident(c) || isdigit(c)) && length < sizeof(string) - 1);
+        ungetc(c, fp);
+        string[length] = '\0';
+        if (!strcmp(string, "nil")) return nil;
+        return newSymbol(string);
     }
     if (c == '(') { //  ()  (x)  (x . y)  (x y z)  (x y . z)
-	oop list = nil;
-	c = nextchar(fp);
-	while (c != ')' && c != '.') {
-	    ungetc(c, fp);
-	    oop obj = read(fp);
-	    if (!obj) {
-		fprintf(stderr, "EOF while reading list\n");
-		exit(1);
-	    }
-	    list = newCell(obj, list); // push element onto front of list
-	    c = nextchar(fp);
-	}
-	oop last = nil;
-	if (c == '.') {
-	    last = read(fp);
-	    if (!last) {
-		fprintf(stderr, "EOF while reading list\n");
-		exit(1);
-	    }
-	    c = nextchar(fp);
-	}
-	if (c != ')') {
-	    fprintf(stderr, "')' expected at end of list\n");
-	    exit(1);
-	}
-	list = revlist(list, last);
-	return list;
+        oop list = nil;
+        c = nextchar(fp);
+        while (c != ')' && c != '.') {
+            ungetc(c, fp);
+            oop obj = read(fp);
+            if (!obj) {
+            fprintf(stderr, "EOF while reading list\n");
+            exit(1);
+            }
+            list = newCell(obj, list); // push element onto front of list
+            c = nextchar(fp);
+        }
+        oop last = nil;
+        if (c == '.') {
+            last = read(fp);
+            if (!last) {
+                fprintf(stderr, "EOF while reading list\n");
+                exit(1);
+            }
+            c = nextchar(fp);
+        }
+        if (c != ')') {
+            fprintf(stderr, "')' expected at end of list\n");
+            exit(1);
+        }
+        list = revlist(list, last);
+        return list;
+    }
+    if (c == '['){
+        /* 2023/07/24 †　*/
+        oop program = newArray(10);
+        int size = 0;
+        for(;;){
+            oop obj = read(stdin);
+            compile(program,obj,nil);
+            int c = nextchar(fp);
+            if(c == ']'){
+                emitI(HALT);
+                break;
+            }
+            ungetc(c,fp);
+        }
+        return program; 
     }
     if (c == '\'') {
 		oop obj = read(fp);
@@ -1030,12 +1065,12 @@ oop read(FILE *fp) // read stdin and return an object, or 0 if EOF
 		return newCell(unquote, newCell(obj, nil));
     }
     if ('"' == c) { // string
-	char string[64];
-	int length = 0;
-	while(('"' != (c = getc(fp))) && length < sizeof(string) - 1)
-	    string[length++] = c;
-	string[length] = '\0';
-	return newString(strdup(string));
+        char string[64];
+        int length = 0;
+        while(('"' != (c = getc(fp))) && length < sizeof(string) - 1)
+            string[length++] = c;
+        string[length] = '\0';
+        return newString(strdup(string));
     }
     if (c == EOF) return 0;
     fprintf(stderr, "illegal character: 0x%02x\n", c);
@@ -1056,7 +1091,6 @@ Result expand(oop obj, oop env)
 
 
 int opt_v = 0;
-
 void replFile(FILE *fp)
 {
     // discard #!interpreter line
@@ -1097,7 +1131,6 @@ void replFile(FILE *fp)
     }
 }
 
-
 void replPath(char *path)
 {
     FILE *fp = fopen(path, "r");
@@ -1110,22 +1143,12 @@ void replPath(char *path)
 }
 
 /*
--------------------------2023/07/18------------------------
-//†
-    2023/07/18
+-------------------------2023/07/18------------------------ †
     reading array
     define 
 */
 
-enum {HALT, LITERAL, VARIABLE, CALL,};
 
-/*
-(define a 10) 
-=> literal, 10
-=> variable, a(ERROR: undefined variable)
-=> variable, define(sepc_func)
-=> call,
-*/
 oop execute(oop program,oop env){
     int pc = 0;
     oop stack = newArray(10);
@@ -1139,7 +1162,7 @@ oop execute(oop program,oop env){
             }
             case VARIABLE:{
                 oop name = Array_get(program,pc++);
-                oop ass = assoc(name,env);
+                oop ass  = assoc(name,env);
                 if (ass != nil) {
                     assert(Object_type(ass) == Cell);
                     Array_push(stack,(ass->Cell.d));
@@ -1149,13 +1172,12 @@ oop execute(oop program,oop env){
                     Array_push(stack,name->Symbol.value);
                     continue;
                 }
-                fprintf(stderr, "undefined variable: %s\n", name->Symbol.name);
+                fprintf(stderr, "undefined variable: %s[execute]\n", name->Symbol.name);
                 exit(1);
-                continue;
             }
             case CALL:{
                 oop value = Array_get(program,pc++);
-                oop func = Array_pop(stack);
+                oop func = Array_pop(stack);// "+", "-", "*", "/" and "define" and so on...
                 int n = Integer_value(value);
                 oop args = nil;
                 while(n--){
@@ -1168,12 +1190,27 @@ oop execute(oop program,oop env){
                         result = func->Primitive.function(args, env).value;
                         break;
                     }
+                    case Special:{
+                        result = func->Primitive.function(args,env).value;
+                        break;  //??? if define, is it needed to stack in?
+                    }
                     default:{
                         fprintf(stderr,"cannot call\n");
                         exit(1);
                     }
                 }
                 Array_push(stack,result);
+                continue;
+            }
+            case DEF:{
+                oop value = Array_pop(stack);
+                oop name  = Array_pop(stack); 
+                if (Object_type(name) != Symbol) {
+                    fprintf(stderr, "name is not a symbol[execute]\n");
+                    exit(1);
+                }
+                define(name, value);
+                Array_push(stack,value);
                 continue;
             }
             case HALT:{
@@ -1188,17 +1225,10 @@ oop execute(oop program,oop env){
 }
 
 // omit writing
-#define emit(X) Array_push(program,X)
-#define emitI(A) emit(newInteger(A))
-#define emitS(A) emit(newSymbol(A))
-#define emitII(OP,A) emitI(OP); emitI(A)
-#define emitIS(OP,A) emitI(OP); emitS(A)
-#define emitIO(OP,A) emitI(OP); emit(A)
-
-void compile(oop program,oop exp, oop env);
-
 // (+ 1 2) -> (1 2) -> (2 nil) -> nil
 // 2 -> 1 -> + 
+// stack[2, 1, +, nil,]
+
 int compileArgs(oop program,oop exp,oop env){
     if (Object_type(exp) != Cell) return 0;
     int n = compileArgs(program, exp->Cell.d, env);
@@ -1219,6 +1249,18 @@ void compile(oop program,oop exp, oop env){
             break;
         }
         case Cell:{
+            if (Object_type(exp->Cell.a) == Symbol){
+                if (strcmp(Symbol_name(car(exp)), "define")==0){
+                    printf("define: ");
+                    printf("%s",Symbol_name(car(exp)));
+                    print(cadr(exp));
+                    print(caddr(exp));
+                    emitIO(LITERAL, cadr(exp) );
+                    emitIO(LITERAL, caddr(exp));
+                    emitI(DEF);
+                    break;
+                }
+            }
             int n = compileArgs(program,exp,env);
             emitII(CALL, n-1);
             break;
@@ -1226,7 +1268,7 @@ void compile(oop program,oop exp, oop env){
         default:{
             fprintf(stderr,"cannot compile\n");
             exit(1);
-        }
+        } 
     }
 }
 
@@ -1235,6 +1277,17 @@ oop compileProgram(oop exp, oop env){
     compile(program,exp,env);
     emitI(HALT);
     return program;
+}
+
+void println_Array(oop obj){
+	println(obj);
+    assert(Object_type(obj)==Array);
+    int Size = obj->Array.size;
+    if(Size==0){printf("empty\n");return;}
+    while(Size){
+		printf("%02d ",Size-1);
+        println(obj->Array.elements[--Size]);
+    }return;
 }
 
 int main(int argc, char **argv)
@@ -1285,11 +1338,13 @@ int main(int argc, char **argv)
     define(newSymbol("or"),            newSpecial(spec_or    ));
     define(newSymbol("not"),           newSpecial(spec_not   ));
     define(newSymbol("let"),           newSpecial(spec_let   ));
-
+// †
     for(;;){
         oop program = read(stdin);
-        program = compileProgram(program, nil);
-        println(execute(program, nil));
+        execute(program,nil);
+        // println_Array(program);
+        // program = compileProgram(program, nil);
+        // println(execute(program, nil));
     }
     return 0;
     

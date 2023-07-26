@@ -1,4 +1,4 @@
-bambi01-95 m058　
+bambi01-95 m058
 
 week 10: add some function in .c for lisp 
 week 11: split the function into special and primitive
@@ -6,45 +6,11 @@ week 12: add Closure?
 week 13: list allow over limited para
 week 14: define syntax functions
 week 15: add float type and string type
-week 16: gabage collection and expand 
+week 16: Gabage collection and expand 
 week 17: return, break and continue
-week 18: boxed tagged *integer located in pointer
-week 19: vm [basic vm operaton]-> INT, ADD, SUB, DEV, MUL, MOD, JUMP, JUMPF
-week 20: vm [how to work function]> CALL, SWAP, PICK, DROP, 
-week 21: vm [one stack...]
-
-
-
-int program2[] = {
-    INT, 15,
-
-    CALL, 4,
-    DUP,
-    PRINT,
-    DROP,
-    HALT,
-
-    DUP,
-    INT, 2,
-    LESS,
-    JUMPF,4,
-    DROP,
-    INT, 1,
-    RET,    
-
-    DUP,    
-    INT, 1, 
-    SUB,    
-    CALL, -16, 
-    
-    PICK, 1,  
-    INT, 2, 
-    SUB,    
-    CALL, -23,
-    ADD,    
-    INT, 1, 
-    ADD,   
-    SWAP,
-    DROP, 
-    RET,  
-};
+week 18: Boxed tagged *integer located in pointer
+week 19: VM [basic vm operaton]-> INT, ADD, SUB, DEV, MUL, MOD, JUMP, JUMPF
+week 20: VM [how to work function]> CALL, SWAP, PICK, DROP, 
+week 21: Array struct for compiler, array_pop, arrray_push, array_get and array_put
+week 22: Using array struct, make compiler that compile oop to vm lang.
+week 23: compile if, while and closure obj.
