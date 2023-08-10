@@ -1,45 +1,89 @@
+(define a 3)
+(if (< a 2)
+    (print 10)
+    (print 13)
+    (print 14)
+)
+stop
+def add(x,y):
+    ret
+
+
+(define a 4)
+(if (< a 2)
+    (print 1)
+    (if (< a 3)
+        (print 2)
+        (if (< a 4)
+            (print 3)
+            (print 4))))
+
+stop
+
+;;all test
 (define a 0)
+(while (< a 10)
+    (println a)
+    (if (< a 5)
+        (println a)
+        (println (+ a a))
+    )
+    (setq a (+ a 1))
+)
 
 
+stop
+;; test "if"
+
+(if);nil
+
+(if (< 2 1));nil
+
+(if (< 2 1));nil
+
+(if (< 1 2)
+    12);12
+
+(if (< 2 1)
+    12);nil
+
+(if (< 1 2)
+    12
+    13);12
+
+(if (< 2 1)
+    12
+    13);13
+stop
+
+
+;test "while"
+(define a 0)
 
 (while (< a 10)
     (println (setq a (+ a 1))))
 
 (define a 0)
-
 (while (< a 10)
     (setq a (+ a 1))
-    (println a))
+    (setq a (+ a 1))
+    )
 
-stop
 (define a 0)
+
 (while (< a 10)
+(setq a (+ a 1))
     (setq a (+ a 1))
-    (print a)
-        (print a)
-    (println a))
-stop
+    (setq a (+ a 1))
+    )
+
+(define a 0)
+
 (while (< a 10)
-    (if (< a 5)
-        (println a)
-        (println (+ a a)))
+(setq a (+ a 1))
     (setq a (+ a 1))
-)
-
-
-
-stop
+    (setq a (+ a 1))
+    (setq a (+ a 1))
+    )
 
 stop
-
-literal nil
-condition
-jumpf number
-
-consequent
-jump
-
-alternate<- jumpf
-
-done.<-jump
-

@@ -10,7 +10,6 @@
 # define GC_init()
 #endif
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,6 +69,7 @@ oop sym_define          = 0;
 oop sym_setq            = 0;
 oop sym_while           = 0;
 oop sym_if              = 0;
+oop sym_lambda          = 0;
 
 oop newObject(type_t type)
 {
@@ -611,7 +611,6 @@ Result prim_println(oop args, oop env)
     RETURN(value);
 }
 
-
 Result prim_putc(oop args, oop env)
 {
     oop value = nil;
@@ -706,8 +705,8 @@ Result prim_concat(oop args, oop env)
 	}
 	case Symbol: {
 	    if (Object_type(b) != Symbol) {
-		fprintf(stderr, "cannot concat symbol and non-symbol\n");
-		exit(1);
+            fprintf(stderr, "cannot concat symbol and non-symbol\n");
+            exit(1);
 	    }
 	    int la = strlen(a->Symbol.name), lb = strlen(b->Symbol.name);
 	    char *buf = malloc(la + lb + 1);
@@ -809,8 +808,8 @@ Result spec_while(oop args, oop env) // (while test expressions...)
 Label:
     while (nil != EVAL(test, env)) {
 		oop exprs = args;
-		while (Cell == Object_type(exprs)) {
-			Result _result = eval(exprs->Cell.a, env);
+		while (Cell == Object_type(exprs)){
+			Result _result = eval(exprs->Cell.a,env);
 			switch(_result.intent){
 				case RET_BREAK:{
 					_result.intent = RET_RESULT;
@@ -888,7 +887,6 @@ Result spec_let(oop args, oop env) // (let ((v1 e1) (v2 e2) ...) exprs...)
     }
     RETURN(result);
 }
-
 
 Result eval(oop exp, oop env)
 {
@@ -1071,9 +1069,7 @@ Result expand(oop obj, oop env)
     RETURN(newCell(EXPAND(head, env), EXPAND(tail, env))); // expand head and tail recursively
 }
 
-
 int opt_v = 0;
-
 void replFile(FILE *fp)
 {
     // discard #!interpreter line
@@ -1126,14 +1122,8 @@ void replPath(char *path)
     fclose(fp);
 }
 
-/*
--------------------------2023/07/18------------------------
-//†
-    2023/07/18
-    reading array
-    define 
-*/
-    /* 0    1           2       3       4      5    6       7   8*/
+
+/*     0    1           2       3       4      5    6       7   8*/
 enum {HALT, LITERAL, VARIABLE, CALL, DEFINE, SETQ, JUMP, JUMPF,DROP,};
 
 oop execute(oop program,oop env){
@@ -1250,25 +1240,40 @@ int compileArgs(oop program,oop exp,oop env){
     return n + 1;
 }
 
-int compileBody(oop program,oop exp, oop env){
-    int count = 0;
-    if(exp == nil)return 0;
+void println_Array(oop obj){
+	println(obj);
+    assert(Object_type(obj)==Array);
+    int Size = obj->Array.size;
+    if(Size==0){printf("empty\n");return;}
+    while(Size){
+        print(obj->Array.elements[--Size]);
+        putchar(' ');
+    }
+    putchar('\n');
+    return;
+}
+
+void compileBody(oop program,oop exp, oop env){
+    if(exp == nil)return;
     for(;;){
-        if(Object_type(exp)==Cell){
-            count += 1;
+        if(Object_type(exp) == Cell){
             emitI(DROP);
             compile(program, exp->Cell.a, env);
             exp = exp->Cell.d;
         }
         else{
-            return (count == 1)?0:1;
+            break;
         }
     }
+    return;
 }
-
 
 void compile(oop program,oop exp, oop env){
     switch(Object_type(exp)){
+        case Undefined:{
+            emitIO(LITERAL,nil);
+            break;
+        }
         case Float:
         case String:
         case Integer:{
@@ -1281,10 +1286,16 @@ void compile(oop program,oop exp, oop env){
         }
         case Cell:{
             oop head = exp->Cell.a;
+            if (head == sym_lambda){// (lambda)
+                printf("this is lambda\n");
+            }
             if (head == sym_define){// (define symbol value)
                 oop name = cadr(exp);
                 oop valu = caddr(exp);
                 if (Object_type(name) != Symbol){
+                    println(exp);
+                    println(name);
+                    println(valu);
                     fprintf(stderr,"define [complie]\n");
                     exit(1);
                 }
@@ -1306,43 +1317,41 @@ void compile(oop program,oop exp, oop env){
             if (head == sym_while){// (while (cond) body...)
                 oop cond = cadr(exp);
                 oop body = cddr(exp);
-
-                emitIO(LITERAL,nil);int p_cond = program->Array.size;// 
+                emitIO(LITERAL,nil);
+                int L1 = program->Array.size;/*cond*/
                 compile(program,cond,env);
-                emitII(JUMPF,0);int p_jumpf = program->Array.size;
-                /* whlie */
-                int i = compileBody(program,body,env);
-                emitII(JUMP, 0);int p_jump = program->Array.size;
-                /* done*/
-                int p_done = p_jump;//should be remove
-                /* jumpf */
-                
-                Array_put(program,p_jumpf-1,newInteger(p_done-p_jumpf-1+i));
-                /* jump  */
-                Array_put(program,p_jump -1,newInteger(p_cond-p_jump));
+                emitII(JUMPF,0);
+                int L2 = program->Array.size;
+                compileBody(program,body,env);
+                emitII(JUMP, 0);
+                int L4 = program->Array.size;/*done*/
+            /* jumpf -> done */
+                Array_put(program,L2-1,newInteger(L4-L2));
+            /* jump  -> cond */
+                Array_put(program,L4-1,newInteger(L1-L4));
                 break;
             }
             if (head == sym_if){//(if (cond) (cons) (altr))
                 oop cond = cadr(exp);
                 oop cons = caddr(exp);
-                oop altr = caddr(cdr(exp));
-
-
+                oop altr = cddr(cdr(exp));
                 compile(program,cond,env);
                 emitII(JUMPF,0);//->else
                 int jump1 = program->Array.size;
-                /*  if  */
+            /* if */
                 compile(program,cons,env);
                 emitII(JUMP,0);//->done
                 int jump2 = program->Array.size;
-                /* else */
-                int p_else    = program->Array.size;
-                compile(program,altr,env);
-                /* done */
+            /* else */
+                int p_else = jump2;
+                emitIO(LITERAL,nil);
+                compileBody(program,altr,env);
+                // compile(program,altr,env);
+            /* done */
                 int p_done = program->Array.size;
-                /* jumpf */
+            /* jumpf -> else */
                 Array_put(program, jump1-1, newInteger(p_else - jump1));
-                /* jump  */
+            /* jump  -> done */
                 Array_put(program, jump2-1, newInteger(p_done - jump2));
                 break;
             }
@@ -1362,19 +1371,6 @@ oop compileProgram(oop exp, oop env){
     compile(program,exp,env);
     emitI(HALT);
     return program;
-}
-
-void println_Array(oop obj){
-	println(obj);
-    assert(Object_type(obj)==Array);
-    int Size = obj->Array.size;
-    if(Size==0){printf("empty\n");return;}
-    while(Size){
-        print(obj->Array.elements[--Size]);
-        putchar(' ');
-    }
-    putchar('\n');
-    return;
 }
 
 int main(int argc, char **argv)
@@ -1397,6 +1393,7 @@ int main(int argc, char **argv)
     sym_setq         = newSymbol("setq");
     sym_while        = newSymbol("while");
     sym_if           = newSymbol("if");
+    sym_lambda       = newSymbol("lambda");
 
     define(newSymbol("+"),     	newPrimitive(prim_add     ));
     define(newSymbol("-"),     	newPrimitive(prim_subtract));
@@ -1437,6 +1434,7 @@ int main(int argc, char **argv)
         program = compileProgram(program, nil);
         println_Array(program);
         println(execute(program, nil));
+        putchar('\n');
     }
     return 0;
     
