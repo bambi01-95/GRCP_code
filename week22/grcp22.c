@@ -913,13 +913,13 @@ int nextchar(FILE *fp)
 {
     int c = getc(fp);
     for (;;) {
-	while (isspace(c)) c = getc(fp);
-	if (c != ';') break;
-	for (;;) {
-	    c = getc(fp);
-	    if (EOF == c) return c;
-	    if (c == '\n') break;
-	}
+	    while (isspace(c)) c = getc(fp);
+	    if (c != ';') break;
+        for (;;) {
+            c = getc(fp);
+            if (EOF == c) return c;
+            if (c == '\n') break;
+        }
     }
     return c;
 }
